@@ -1,3 +1,6 @@
 [submodule "Archipelago"]
 	path = Archipelago
 	url = https://github.com/Troloze/Archipelago
+[submodule "khimera-damg-ap-randomizer-mod"]
+	path = khimera-damg-ap-randomizer-mod
+	url = https://github.com/Troloze/khimera-damg-ap-randomizer-mod
