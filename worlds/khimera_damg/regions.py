@@ -74,14 +74,14 @@ def create_and_connect_region(
         func = None
     elif stage_lock in extra_stages:
         if is_shuffle_detonators:
-            func = lambda state:    state.has(stage_entrances[stage_lock], world.player) \
-                                and state.has(stage_to_detonator_item_index[stage_lock], world.player) # noqa: E731
+            func = lambda state: state.has(stage_entrances[stage_lock], world.player) \
+                             and state.has(stage_to_detonator_item_index[stage_lock], world.player) # noqa: E731
         else:
             # Instead of locking behind detonator item, extra stages will have to be locked
             # behind their parent stages instead.
             parent_stage = extra_to_stage_index[stage_lock]
-            func = lambda state:    state.has(stage_entrances[stage_lock], world.player) \
-                                and state.has(stage_entrances[parent_stage], world.player) # noqa: E731
+            func = lambda state: state.has(stage_entrances[stage_lock], world.player) \
+                             and state.has(stage_entrances[parent_stage], world.player) # noqa: E731
     else:
         func = lambda state: state.has(stage_entrances[stage_lock], world.player) # noqa: E731
 

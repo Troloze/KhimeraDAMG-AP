@@ -6,7 +6,7 @@ LocList = list[LocTuple]
 
 # Name is generated following the convention described in "Item and Location Conventions.md".
 # It is available at the docs folder in the apworld github repository
-def _make_name(stage: StageIndex, loc_type:LocType | str, identifier: str|None = None) -> str:
+def _make_name(stage: StageIndex, loc_type:LocType | str, identifier: str | None = None) -> str:
     name = ""
     if stage != StageIndex.GENERAL:
         name = f"{name}{stage_id_to_name[stage]}: "
@@ -28,8 +28,8 @@ def _make_loc(
         stage: StageIndex,
         loc_type:LocType,
         identifier: int,
-        description: str|None = None,
-        type_description: str|None = None
+        description: str | None = None,
+        type_description: str | None = None
 ) -> LocTuple:
     name = _make_name(stage, loc_type if type_description is None else type_description, description)
     data = _make_data(stage, loc_type, identifier)
@@ -171,7 +171,7 @@ gourmet_gal:LocList = [
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.GOURMET_GAL, 1),
 ]
 
-def _make_loc_table(locs: LocList):
+def _make_loc_table(locs: LocList) -> dict[str, LocData]:
     return dict(locs)
 
 loc_table:dict[str, LocData] = _make_loc_table(

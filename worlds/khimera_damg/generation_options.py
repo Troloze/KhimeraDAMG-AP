@@ -13,7 +13,7 @@ def create_option_groups() -> list[OptionGroup]:
         ret_group_list.append(OptionGroup(name=name, options=options))
     return ret_group_list
 
-def adjust_option_values(world: "KhimeraDAMGWorld"):
+def adjust_option_values(world: "KhimeraDAMGWorld") -> None:
     pass
 
 class ShuffleBooks(Toggle):

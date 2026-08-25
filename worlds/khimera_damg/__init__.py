@@ -67,7 +67,7 @@ class KhimeraDAMGWorld(World):
         create_items(self)
 
     def create_event(self, event: str) -> KhimeraDAMGItem:
-            return KhimeraDAMGItem(event, ItemClassification.progression, None, self.player)
+        return KhimeraDAMGItem(event, ItemClassification.progression, None, self.player)
 
     def set_rules(self) -> None:
 

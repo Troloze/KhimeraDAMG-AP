@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 
 ItemDict = dict[str, ItemData]
 
-def make_item_id(type: ItemType, index: int):
-    return (5000 + type.value) * 100000 + index
+def make_item_id(item_type: ItemType, index: int) -> int:
+    return (5000 + item_type.value) * 100000 + index
 
 # ruff: disable[E501]
 upgrades:ItemDict = {
@@ -137,14 +137,14 @@ item_table = {
 
 # ruff: enable[E501]
 
-def get_filler(world: "KhimeraDAMGWorld"):
+def get_filler(world: "KhimeraDAMGWorld") -> str:
     return list(filler).pop(world.random.randrange(0, len(filler)))
 
 def create_item(world: "KhimeraDAMGWorld", name) -> KhimeraDAMGItem:
     data = item_table[name]
     return KhimeraDAMGItem(name, data.type, data.id, world.player)
 
-def create_items(world: "KhimeraDAMGWorld"):
+def create_items(world: "KhimeraDAMGWorld") -> None:
     # Entrance Items
     for stage in stage_id_to_name:
         if stage in [StageIndex.GENERAL, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
