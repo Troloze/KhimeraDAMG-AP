@@ -1,3 +1,3 @@
 
-def launch():
+def launch() -> None:
     pass

@@ -2,6 +2,7 @@ from enum import IntEnum
 from typing import NamedTuple
 
 from BaseClasses import Item, ItemClassification, Location
+from rule_builder.rules import Rule
 
 
 class KhimeraDAMGLocation(Location):
@@ -66,6 +67,7 @@ class LocType(IntEnum):
 class LocData(NamedTuple):
     id: int
     stage: StageIndex
+    rule: Rule | None
 
 class ItemData(NamedTuple):
     id: int

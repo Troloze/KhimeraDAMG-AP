@@ -1,16 +1,18 @@
-from typing import ClassVar
+from collections.abc import Mapping
+from typing import Any, ClassVar
 
-from BaseClasses import Item, ItemClassification, MultiWorld, Tutorial
+from BaseClasses import Item, ItemClassification, Tutorial
 from worlds.AutoWorld import WebWorld, World
 from worlds.LauncherComponents import Component, Type, components, icon_paths
 from worlds.LauncherComponents import launch as launch_component
 
 from .generation_options import KhimeraDAMGOptions, create_option_groups
-from .items import create_item, create_items, get_filler, item_groups, item_table
-from .locations import loc_table
+from .items import create_item, create_items, get_filler, item_groups, item_table, update_item_classification
+from .locations import apply_location_rules, loc_table
 from .regions import create_regions
-from .types import KhimeraDAMGItem, StageIndex
+from .types import StageIndex
 
+APWORLD_VERSION = "0.0.2"
 
 def client_launch(*args: str):
     from .client import launch
@@ -31,18 +33,21 @@ starting_locations = [
 class WebKhimeraDAMG(WebWorld):
     theme = "stone"
     option_groups = create_option_groups()
-    tutorials:ClassVar[list[Tutorial]] = [Tutorial(
-        "Multiworld Setup Guide",
-        "A guide for setting up Khimera: Destroy All Monster Girls to be played in Archipelago.",
-        "English",
-        "setup_en.md",
-        "setup/en",
-        ["Troloze"]
-    )]
+
+    def __init__(self):
+        self.tutorials = [Tutorial(
+                "Multiworld Setup Guide",
+                "A guide for setting up Khimera: Destroy All Monster Girls to be played in Archipelago.",
+                "English",
+                "setup_en.md",
+                "setup/en",
+                ["Troloze"]
+        )]
 
 class KhimeraDAMGWorld(World):
     game = "Khimera: Destroy All Monster Girls"
     origin_region_name = "Map"
+    required_client_version = (0, 6, 7)
     item_name_to_id:ClassVar[dict[str, int]] = {name: data.id for name, data in item_table.items()}
     location_name_to_id:ClassVar[dict[str, int]] = {name: data.id for name, data in loc_table.items()}
     item_name_groups = item_groups
@@ -50,12 +55,11 @@ class KhimeraDAMGWorld(World):
     options: KhimeraDAMGOptions # type: ignore
     web = WebKhimeraDAMG()
 
-    def __init__(self, multiworld: MultiWorld, player: int):
-        super().__init__(multiworld, player)
-
 
     def generate_early(self) -> None:
         self.starting_locations = starting_locations
+        self.progression_overrides:dict[str, ItemClassification] = {}
+        update_item_classification(self)
         return super().generate_early()
 
     def create_regions(self) -> None:
@@ -64,20 +68,26 @@ class KhimeraDAMGWorld(World):
     def create_items(self) -> None:
         create_items(self)
 
-    def create_event(self, event: str) -> KhimeraDAMGItem:
-            return KhimeraDAMGItem(event, ItemClassification.progression, None, self.player)
-
     def set_rules(self) -> None:
 
-        # Setting up the win condition.
-        self.multiworld.get_location(
-            "The Spider's Web: Clear",
-            self.player
-        ).place_locked_item(self.create_event("Victory"))
+        apply_location_rules(self)
 
+        # Setting up the win condition.
         self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
         return super().set_rules()
+
+    def fill_slot_data(self) -> Mapping[str, Any]:
+        return {
+            "apworld_version": APWORLD_VERSION,
+            "options": self.options.as_dict(
+                "death_link",
+                "shuffle_books",
+                "shuffle_fairies",
+                "shuffle_detonators",
+                "shuffle_gourmet_gal"
+            )
+        }
 
     def create_item(self, name: str) -> Item:
         return create_item(self, name)
