@@ -31,14 +31,16 @@ starting_locations = [
 class WebKhimeraDAMG(WebWorld):
     theme = "stone"
     option_groups = create_option_groups()
-    tutorials:ClassVar[list[Tutorial]] = [Tutorial(
-        "Multiworld Setup Guide",
-        "A guide for setting up Khimera: Destroy All Monster Girls to be played in Archipelago.",
-        "English",
-        "setup_en.md",
-        "setup/en",
-        ["Troloze"]
-    )]
+
+    def __init__(self):
+        self.tutorials = [Tutorial(
+                "Multiworld Setup Guide",
+                "A guide for setting up Khimera: Destroy All Monster Girls to be played in Archipelago.",
+                "English",
+                "setup_en.md",
+                "setup/en",
+                ["Troloze"]
+        )]
 
 class KhimeraDAMGWorld(World):
     game = "Khimera: Destroy All Monster Girls"
