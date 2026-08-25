@@ -1,4 +1,11 @@
+from typing import TYPE_CHECKING
+
+from rule_builder.rules import Has, Rule
+
 from .types import LocData, LocType, StageIndex, loc_type_to_name, stage_id_to_name
+
+if TYPE_CHECKING:
+    from . import KhimeraDAMGWorld
 
 LocTuple = tuple[str, LocData]
 LocList = list[LocTuple]
@@ -18,21 +25,27 @@ def _make_name(stage: StageIndex, loc_type:LocType | str, identifier: str | None
         name = f"{name} - {identifier}"
     return name
 
-def _make_data(stage: StageIndex, loc_type:LocType, identifier: int) -> LocData:
+def _make_data(
+    stage: StageIndex,
+    loc_type:LocType,
+    identifier: int,
+    rule: Rule | None = None
+) -> LocData:
     if identifier == 0:
         raise ValueError("Location ID identifier segment cannot be 0.")
     id = stage.value * 10000000 + loc_type.value * 100000 + identifier
-    return LocData(id, stage)
+    return LocData(id, stage, rule)
 
 def _make_loc(
         stage: StageIndex,
         loc_type:LocType,
         identifier: int,
         description: str | None = None,
-        type_description: str | None = None
+        type_description: str | None = None,
+        rule: Rule | None = None
 ) -> LocTuple:
     name = _make_name(stage, loc_type if type_description is None else type_description, description)
-    data = _make_data(stage, loc_type, identifier)
+    data = _make_data(stage, loc_type, identifier, rule=rule)
     return (name, data)
 
 clear:LocList = [
@@ -101,13 +114,15 @@ fairies:LocList = [
 
 # Harvest event books will be stored separately when implemented.
 books:LocList = [
-    _make_loc(StageIndex.RAGAZZA_TOWN, LocType.BOOK, 1, "1 (Scuttlebit)"),
+    _make_loc(StageIndex.RAGAZZA_TOWN, LocType.BOOK, 1, "1 (Scuttlebit)",
+              rule=Has("Harpy Boost")),
     _make_loc(StageIndex.RAGAZZA_TOWN, LocType.BOOK, 2, "2 (Nyazione)"),
 
     _make_loc(StageIndex.CHELSHIAS_HOUSE, LocType.BOOK, 1, "1 (Muffey)"),
 
     _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 1, "1 (Gourmet Gal)"),
-    _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 2, "2 (The Fairy Queen)"),
+    _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 2, "2 (The Fairy Queen)",
+              rule=Has("Fairy",count=12)),
 
     _make_loc(StageIndex.QUIZ, LocType.BOOK, 1, "1 (Mouthface)"),
 
@@ -182,3 +197,11 @@ loc_table:dict[str, LocData] = _make_loc_table(
     + detonators
     + gourmet_gal
 )
+
+win_condition_location = "The Spider's Web: Clear"
+
+def apply_location_rules(world: "KhimeraDAMGWorld"):
+    for location in world.get_locations():
+        data = loc_table.get(location.name)
+        if data is not None and data.rule is not None:
+            world.set_rule(location, data.rule)

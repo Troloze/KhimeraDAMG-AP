@@ -38,12 +38,36 @@ developer writes the code. Your role is to investigate, explain, and advise.
 - `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. 
 - `docs/` — design notes (option list, item/location naming conventions, communication contract)
 
+## Build and test environment
+
+**Testing happens against the installed Archipelago build, not against the `Archipelago/`
+submodule.** The submodule is source for reading only.
+
+- **Do not create anything inside `Archipelago/`** — no `custom_worlds/` folder, no
+  generation output, no installed dependencies. Rule 1 applies to it in full.
+- The single permitted exception is a *directory link* at
+  `Archipelago/custom_worlds/khimera_damg` pointing at `worlds/khimera_damg`, so imports
+  and static analysis resolve against real core source. It must be a link, never a copy,
+  and it exists for import checking only — not as a test target. Ask before creating it.
+- **The apworld is built by zipping `worlds/khimera_damg/`** into `khimera_damg.apworld`,
+  with `khimera_damg/` as the single top-level directory inside the archive, and copying
+  that file to the installed app folder:
+  `C:\ProgramData\Archipelago\custom_worlds\`
+  (note the exact spelling: `ProgramData` has no space, `custom_worlds` has an underscore).
+- Generation and any client testing are then run from that installed build
+  (`ArchipelagoLauncher.exe` / `ArchipelagoGenerate.exe`), and its output goes to the
+  install's own `output/` folder — never into this repository.
+- The installed build's core version is the one that matters for compatibility. Check
+  `C:\ProgramData\Archipelago\manifest.json` rather than assuming it matches the submodule.
+- Building, copying, and generating all write files. Propose the commands and wait to be
+  asked, the same as any other change.
+
 ## Code style
 
 All Python in `worlds/khimera_damg/` must follow the Archipelago style guide
 (`Archipelago/docs/style.md`). **Check these on every review and before writing new code:**
 
-- **120 characters per line** — hard limit, applies to data tables too.
+- **120 characters per line**.
 - **No trailing whitespace** on any line.
 - **Double quotes** for all strings. Use f-strings over concatenation, with single
   quotes inside them: `f"Like {dct['key']}"`.
@@ -62,8 +86,13 @@ All Python in `worlds/khimera_damg/` must follow the Archipelago style guide
   top-level definitions, no shadowing builtins (`id`, `type`, `map`), no unused imports.
 - Avoid `match` statements unless they genuinely pattern-match.
 
-Reference config: `Archipelago/ruff.toml` (line-length 120, py311). To lint locally:
+Reference config: `Archipelago/ruff.toml` (line-length 120, py311). 
+You may also lint locally using:
 `ruff check --config Archipelago/ruff.toml worlds/khimera_damg/`
+
+Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]` or 
+`# ruff: enable[]` are to be viewed as a deliberate choice by the user to go against 
+the style rules and should be allowed.
 
 ## Archipelago correctness rules
 
