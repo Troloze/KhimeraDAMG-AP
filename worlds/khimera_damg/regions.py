@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import CollectionRule, Region
 
-from .locations import books, clear, detonators, fairies, gourmet_gal, upgrades, win_condition_location
+from .locations import books, clear, detonators, fairies, gourmet_gal, upgrades
 from .types import (
     KhimeraDAMGItem,
     KhimeraDAMGLocation,
@@ -50,22 +50,14 @@ def assign_locations_to_region(world: "KhimeraDAMGWorld", region: Region, stage:
     if world.options.shuffle_fairies:
         locations |= {name: data.id for name, data in fairies if data.stage == stage}
     else:
-        event_locations |= {name: "Fairy" for name, data in fairies if data.stage == stage}
+        if world.options.shuffle_books:
+            event_locations |= {name: "Fairy" for name, data in fairies if data.stage == stage}
 
     if world.options.shuffle_detonators:
         locations |= {name: data.id for name, data in detonators if data.stage == stage}
 
     if world.options.shuffle_gourmet_gal:
         locations |= {name: data.id for name, data in gourmet_gal if data.stage == stage}
-
-    if win_condition_location in locations:
-        locations.pop(win_condition_location)
-        region.add_event(
-            f"{win_condition_location} (Goal)" ,
-            "Victory",
-            location_type=KhimeraDAMGLocation,
-            item_type=KhimeraDAMGItem
-        )
 
     region.add_locations(locations, KhimeraDAMGLocation)
 
