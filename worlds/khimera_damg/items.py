@@ -154,6 +154,8 @@ def create_item(world: "KhimeraDAMGWorld", name) -> KhimeraDAMGItem:
     return KhimeraDAMGItem(name, classification, data.id, world.player)
 
 def create_items(world: "KhimeraDAMGWorld") -> None:
+    itempool: list[KhimeraDAMGItem] = []
+    unfilled: int = len(world.multiworld.get_unfilled_locations(world.player))
     # Entrance Items
     for stage in stage_id_to_name:
         if stage in [StageIndex.GENERAL, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
@@ -163,29 +165,37 @@ def create_items(world: "KhimeraDAMGWorld") -> None:
             # Place in starting inventory, not pool
             world.push_precollected(entrance_item)
         else:
-            world.multiworld.itempool.append(entrance_item)
+            itempool.append(entrance_item)
 
     # Upgrade
     for entry in upgrades:
         upgrade_item = world.create_item(entry)
-        world.multiworld.itempool.append(upgrade_item)
+        itempool.append(upgrade_item)
 
     if world.options.shuffle_fairies:
-        for _i in range(item_frequencies["Fairy"]):
+        for _ in range(item_frequencies["Fairy"]):
             fairy = world.create_item("Fairy")
-            world.multiworld.itempool.append(fairy)
+            itempool.append(fairy)
 
     if world.options.shuffle_books:
         for entry in books:
             book = world.create_item(entry)
-            world.multiworld.itempool.append(book)
+            itempool.append(book)
 
     if world.options.shuffle_detonators:
         for entry in detonators:
             detonator = world.create_item(entry)
-            world.multiworld.itempool.append(detonator)
+            itempool.append(detonator)
 
     if world.options.shuffle_gourmet_gal:
         for entry in gourmet_upgrades:
             gourmet_upgrade = world.create_item(entry)
-            world.multiworld.itempool.append(gourmet_upgrade)
+            itempool.append(gourmet_upgrade)
+
+    itempool_count = len(itempool)
+    world.multiworld.itempool += itempool
+    filler_count = unfilled - itempool_count
+    if filler_count > 0:
+        for _ in range(filler_count):
+            world.multiworld.itempool.append(world.create_filler())
+

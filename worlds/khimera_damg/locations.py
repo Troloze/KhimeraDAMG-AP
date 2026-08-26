@@ -1,8 +1,18 @@
 from typing import TYPE_CHECKING
 
+from BaseClasses import Region
 from rule_builder.rules import Has, Rule
 
-from .types import LocData, LocType, StageIndex, loc_type_to_name, stage_id_to_name
+from .generation_options import VictoryCondition
+from .types import (
+    KhimeraDAMGItem,
+    KhimeraDAMGLocation,
+    LocData,
+    LocType,
+    StageIndex,
+    loc_type_to_name,
+    stage_id_to_name,
+)
 
 if TYPE_CHECKING:
     from . import KhimeraDAMGWorld
@@ -198,10 +208,20 @@ loc_table:dict[str, LocData] = _make_loc_table(
     + gourmet_gal
 )
 
-win_condition_location = "The Spider's Web: Clear"
-
-def apply_location_rules(world: "KhimeraDAMGWorld"):
+def apply_location_rules(world: "KhimeraDAMGWorld") -> None:
     for location in world.get_locations():
         data = loc_table.get(location.name)
         if data is not None and data.rule is not None:
             world.set_rule(location, data.rule)
+
+def apply_goal_logic(world: "KhimeraDAMGWorld") -> None:
+    host: Region | None = None
+    rule: Rule | None = None
+
+    if world.options.victory_condition == VictoryCondition.option_the_spiders_web:
+        host, rule = world.get_region(stage_id_to_name[StageIndex.THE_SPIDERS_WEB]), None
+
+    if host is not None:
+        host.add_event("Victory", rule=rule, location_type=KhimeraDAMGLocation, item_type=KhimeraDAMGItem)
+    else:
+        raise ValueError("No victory condition has been set.")

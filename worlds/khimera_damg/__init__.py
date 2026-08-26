@@ -1,16 +1,16 @@
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
-from BaseClasses import Item, ItemClassification, Tutorial
+from BaseClasses import ItemClassification, Tutorial
 from worlds.AutoWorld import WebWorld, World
 from worlds.LauncherComponents import Component, Type, components, icon_paths
 from worlds.LauncherComponents import launch as launch_component
 
 from .generation_options import KhimeraDAMGOptions, create_option_groups
 from .items import create_item, create_items, get_filler, item_groups, item_table, update_item_classification
-from .locations import apply_location_rules, loc_table
+from .locations import apply_goal_logic, apply_location_rules, loc_table
 from .regions import create_regions
-from .types import StageIndex
+from .types import KhimeraDAMGItem, StageIndex
 
 APWORLD_VERSION = "0.0.2"
 
@@ -64,6 +64,7 @@ class KhimeraDAMGWorld(World):
 
     def create_regions(self) -> None:
         create_regions(self)
+        apply_goal_logic(self)
 
     def create_items(self) -> None:
         create_items(self)
@@ -82,6 +83,7 @@ class KhimeraDAMGWorld(World):
             "apworld_version": APWORLD_VERSION,
             "options": self.options.as_dict(
                 "death_link",
+                "victory_condition",
                 "shuffle_books",
                 "shuffle_fairies",
                 "shuffle_detonators",
@@ -89,11 +91,10 @@ class KhimeraDAMGWorld(World):
             )
         }
 
-    def create_item(self, name: str) -> Item:
-        return create_item(self, name)
-
     def get_filler_item_name(self) -> str:
         return get_filler(self)
 
+    def create_item(self, name: str) -> KhimeraDAMGItem:
+        return create_item(self, name)
 
 
