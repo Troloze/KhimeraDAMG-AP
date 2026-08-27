@@ -111,3 +111,13 @@ These cause real bugs, not just style complaints:
   as default arguments.
 - The item pool and the fillable location count must match. `get_filler_item_name` must
   return a *repeatable* item, never a unique one.
+
+## Other information
+
+This version of the apworld has not been published yet. There is no such thing as a
+"compatibility breaking change" because there is nothing for the current version to
+be compatible with yet. Assume every change made are changes to the first ever version of
+the apworld, meaning compatibility checks aren't required yet.
+
+Compatibility rules will start being enforced once version 0.1.0 is properly released;
+this section will be removed by then.

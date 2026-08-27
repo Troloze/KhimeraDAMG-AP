@@ -40,17 +40,18 @@ Enemy location names will have the enemy name on the type depending on Enemysani
 ### BB - Type identifier
 - 00: Generic/Misc
 - 01: Stage Clear
-- 02: Fairy
-- 03: Book
-- 04: Candy
-- 05: Detonator
-- 06: Gourmet Gal
-- 07: Costume 
-- 08: Checkpoint
-- 09: Enemy 
-- 10: Coin
-- 11: Gem
-- 12: Food
+- 02: Miniboss
+- 03: Fairy
+- 04: Book
+- 05: Candy
+- 06: Detonator
+- 07: Gourmet Gal
+- 08: Costume 
+- 09: Checkpoint
+- 10: Enemy 
+- 11: Coin
+- 12: Gem
+- 13: Food
 ### CCCCC - Unique Identifier
 Never is 00000.
 On most cases will be a simple incremental identifier for the items specified by the region and type.

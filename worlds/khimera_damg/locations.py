@@ -58,7 +58,25 @@ def _make_loc(
     data = _make_data(stage, loc_type, identifier, rule=rule)
     return (name, data)
 
-clear:LocList = [
+boss_encounter_alias:str = f"{loc_type_to_name[LocType.MINIBOSS]} (?)"
+
+minibosses:LocList = [
+    _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.MINIBOSS, 1, "Versus Pirates"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.MINIBOSS, 1, "Versus Wednesday"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.MINIBOSS, 1, "Versus Thursday"),
+    _make_loc(StageIndex.SKY_FORTRESS, LocType.MINIBOSS, 1, "Versus Monday"),
+    _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.MINIBOSS, 1, "Versus Tuesday"),
+    _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 1, "Versus Monday & Tuesday"),
+    _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 2, "Versus Wednesday & Thursday"),
+
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 1, "Versus Serpantina", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 2, "Versus Anchovy", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 3, "Versus Pacifica", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 4, "Versus Amelia", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 5, "Versus Mimi", boss_encounter_alias),
+]
+
+clears:LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 1),
@@ -200,7 +218,8 @@ def _make_loc_table(locs: LocList) -> dict[str, LocData]:
     return dict(locs)
 
 loc_table:dict[str, LocData] = _make_loc_table(
-    clear
+    clears
+    + minibosses
     + upgrades
     + fairies
     + books
