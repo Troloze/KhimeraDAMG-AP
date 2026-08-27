@@ -112,7 +112,37 @@ gourmet_upgrades:ItemDict = {
 }
 
 filler:ItemDict = {
-    "Nothing": ItemData(make_item_id(ItemType.FILLER, 1), ItemClassification.filler)
+    "Coin": ItemData(make_item_id(ItemType.FILLER, 1), ItemClassification.filler),
+    "Small Gem": ItemData(make_item_id(ItemType.FILLER, 2), ItemClassification.filler),
+    "Gem": ItemData(make_item_id(ItemType.FILLER, 3), ItemClassification.filler),
+    "Large Gem": ItemData(make_item_id(ItemType.FILLER, 4), ItemClassification.filler),
+    "Food": ItemData(make_item_id(ItemType.FILLER, 5), ItemClassification.filler),
+}
+
+filler_weights:dict[str, int] = {
+    "Coin": 30,
+    "Small Gem": 20,
+    "Gem": 10,
+    "Large Gem": 5,
+    "Food": 5
+}
+
+# Ensure parity between filler and filler_weights, checked at apworld loading so it is caught early on testing.
+def validate_filler() -> None:
+    if not filler.keys() == filler_weights.keys():
+        raise ValueError("filler and filler_weights have different keys.")
+validate_filler()
+
+filler_item_names:list[str] = list(filler_weights.keys())
+filler_item_weights:list[int] = list(filler_weights.values())
+
+# Not currently added to item table; the first alpha release won't have traps.
+traps:ItemDict = {
+    "Cannonball Trap": ItemData(make_item_id(ItemType.TRAPS, 1), ItemClassification.trap),
+    "Floof Aviator Swarm Trap": ItemData(make_item_id(ItemType.TRAPS, 2), ItemClassification.trap),
+    "Kiran Drive-By Trap": ItemData(make_item_id(ItemType.TRAPS, 3), ItemClassification.trap),
+    "Box Trap": ItemData(make_item_id(ItemType.TRAPS, 4), ItemClassification.trap),
+    "Random Enemy Trap": ItemData(make_item_id(ItemType.TRAPS, 5), ItemClassification.trap),
 }
 
 item_frequencies = {
@@ -144,7 +174,8 @@ def update_item_classification(world: "KhimeraDAMGWorld") -> None:
             world.progression_overrides["Fairy"] = ItemClassification.progression_deprioritized_skip_balancing
 
 def get_filler(world: "KhimeraDAMGWorld") -> str:
-    return list(filler).pop(world.random.randrange(0, len(filler)))
+    # No trap logic yet
+    return world.random.choices(filler_item_names, weights=filler_item_weights)[0]
 
 def create_item(world: "KhimeraDAMGWorld", name) -> KhimeraDAMGItem:
     data = item_table[name]

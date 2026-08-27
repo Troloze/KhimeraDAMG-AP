@@ -52,17 +52,18 @@ class ItemType(IntEnum):
     DETONATOR = 5
     GOURMET_GAL = 6
     # COSTUME = 7
-    # TRAPS = 8
+    TRAPS = 8
     FILLER = 9
 
 class LocType(IntEnum):
     GENERAL = 0
     STAGE_CLEAR = 1
-    FAIRY = 2
-    BOOK = 3
-    # CANDY = 4
-    DETONATOR = 5
-    GOURMET_GAL = 6
+    MINIBOSS = 2
+    FAIRY = 3
+    BOOK = 4
+    # CANDY = 5
+    DETONATOR = 6
+    GOURMET_GAL = 7
 
 class LocData(NamedTuple):
     id: int
@@ -117,6 +118,7 @@ stage_entrances:dict[StageIndex, str] = {
 loc_type_to_name:dict[LocType, str] = {
     LocType.GENERAL:                "General",
     LocType.STAGE_CLEAR:            "Clear",
+    LocType.MINIBOSS:               "Miniboss",
     LocType.FAIRY:                  "Fairy",
     LocType.BOOK:                   "Log Book",
     LocType.DETONATOR:              "Detonator",
