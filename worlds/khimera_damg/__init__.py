@@ -12,16 +12,25 @@ from .locations import apply_goal_logic, apply_location_rules, loc_table
 from .regions import create_regions
 from .types import KhimeraDAMGItem, StageIndex
 
-APWORLD_VERSION = "0.0.2"
+APWORLD_VERSION: str = "0.0.2"
+GAME_ID: str = "khimera_damg"
 
-def client_launch(*args: str):
+def client_launch(*args: str) -> None:
     from .client import launch
-    launch_component(launch, name="KhimeraDAMGLauncher", args=args)
-    pass
+    launch_component(launch, name="KhimeraDAMGClient", args=args)
 
-components.append(Component("Khimera: Destroy All Monster Girls Launcher", "KhimeraDAMGLauncher", func=client_launch,
-                            component_type=Type.CLIENT, icon="khimera_damg"))
-icon_paths["khimera_damg"] = f"ap:{__name__}/icons/chelshia.png"
+components.append(
+    Component(
+        "Khimera: Destroy All Monster Girls Client",
+        func=client_launch,
+        component_type=Type.CLIENT,
+        icon=GAME_ID,
+        game_name="Khimera: Destroy All Monster Girls",
+        supports_uri=True
+    )
+)
+
+icon_paths[GAME_ID] = f"ap:{__name__}/icons/chelshia.png"
 starting_locations = [
     StageIndex.RAGAZZA_TOWN,
     StageIndex.CHELSHIAS_HOUSE,

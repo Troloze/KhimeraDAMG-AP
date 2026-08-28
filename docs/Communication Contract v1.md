@@ -1,7 +1,13 @@
-The client and the game will communicate via flag files dropped in the game's files.
 # Meta
 This specification deliberately does not cover implementation specific information such as pooling time, among other things. These should be determined by what suits the platform this will implemented in best. 
-# General Specification
+
+This specification is supposed to be changed and adapted to the needs of newer features that are introduced as the apworld is developed. However, since the game will support retrocompatibility, any changes made to the contract need to be documented. 
+Compatibility breaking changes will be written to a new document and stored as `Communication Contract v<X>.md`; the latest version will be in the `docs` folder, and the older version will be kept in `docs/communication`.
+
+The client will maintain the logic for older versions of the communication contract, using it when necessary.
+
+# Contract Specification.
+The client and the game will communicate via flag files dropped in the game's files.
 ## Production and consumption policy.
 All files will be encoded as plain ASCII text, files will be deleted after consumption unless stated otherwise. 'Consumption' refers to both the reading and the application of the data, files should only be deleted once the data is truly no longer needed. 
 
