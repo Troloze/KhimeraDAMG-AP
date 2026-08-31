@@ -18,7 +18,7 @@ from CommonClient import (
 from NetUtils import JSONMessagePart, JSONtoTextParser
 
 from . import GAME_ID
-from .game_communication import KhimeraCommunicationHandler, get_contract
+from .game_communication import KhimeraCommunicationHandler
 from .launcher import KhimeraDAMGLauncher
 
 if TYPE_CHECKING:
@@ -64,8 +64,7 @@ class KhimeraDAMGContext(CommonContext):
     def start_up_game_processes(self) -> None:
         host_apworld_version: str = self.slot_data["apworld_version"]
         if self.communication_handler is None:
-            contract = get_contract(host_apworld_version)
-            self.communication_handler = KhimeraCommunicationHandler(contract, self)
+            self.communication_handler = KhimeraCommunicationHandler(host_apworld_version, self)
         if not self.launcher.is_game_running:
             if self.launcher.stored_data_validated:
                 self.launcher.launch_game(host_apworld_version)

@@ -1,0 +1,24 @@
+**How to use**
+Write todo tasks down here.
+This isn't an exhaustive list
+Do not delete items until you've finished the PR
+Move the "todo after PR" items into the "todo before sending PR" section once you've finished the PR
+
+**Todo before sending a PR**
+
+- Refactor CommunicationContract system into packages
+
+- ~~Use `getattr(cls, <method_name>)` on Callable mapping dicts and update their value types to str~~ (Done)
+- ~~Fix deserializer not doing safety checks.~~ (Done)
+  - ~~On safety check failure, drop the row and continue normally.~~ (Done)
+- ~~Both the serializer and deserializer should have failure information appended to the return~~ (Done)
+  - ~~To inform the caller whether a write/read was successful or not.~~ (Done)
+  - ~~Specially useful for heartbeat checking, since failure would otherwise be recognized as staleness.~~ (Done)
+- ~~Test the contract~~ (Done)
+  - ~~Create a few test suites for each writer and reader~~ (Done)
+  - ~~Test the parsers directly by parsing a string into events and back to strings, and also the other way around.~~ (Done)
+
+**Todo right after sending the PR** 
+- Incorporate the ionium AP-index repo as a submodule
+  - This will allow the use of their automated apworld tests.
+  - Useful considering I plan on incorporating my apworld to the index
