@@ -5,12 +5,11 @@ Do not delete items until you've finished the PR
 Move the "todo after PR" items into the "todo before sending PR" section once you've finished the PR
 
 **Todo before sending a PR**
-- ~~Incorporate the new rules into the ruff and fix the several issues that will end up popping up~~ (Done)
-- ~~Refactor all classes so that internal attribute names have an underscore at the start~~ (Done)
-
-**Todo right after sending the PR** 
 - Incorporate the ionium AP-index repo as a submodule
   - This will allow the use of their automated apworld tests.
   - Useful considering I plan on incorporating my apworld to the index
+
+
+**Todo right after sending the PR** 
 
 - Implement JSON into contract

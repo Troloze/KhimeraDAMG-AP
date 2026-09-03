@@ -119,6 +119,85 @@ These cause real bugs, not just style complaints:
   as default arguments.
 - The item pool and the fillable location count must match. `get_filler_item_name` must
   return a *repeatable* item, never a unique one.
+- Placements must agree in both directions: if item A sits on location A, `item.location` and
+  `location.item` must point at each other.
+- Do not change item or location placements from an output or stage step.
+
+Several of these are enforced by the fuzzer used to gate index inclusion; see
+"Distribution target: the ionium index" below.
+
+## Distribution target: the ionium index
+
+The apworld is meant to be submitted to the ionium index
+(<https://github.com/ionium-ap/Archipelago-index>) once a stable 0.1.0 exists. The criteria
+below are acceptance requirements for that release, not style preferences.
+
+The index's own README opens with "Do **NOT** make demands of apworld authors to cater their
+apworlds for inclusion in this index." Respect that: raise these points when reviewing code
+that already touches the relevant area, not as a standing checklist to push on the developer.
+
+### Hard requirements for inclusion
+
+- **A stable public URL** — a GitHub release artifact or a direct link to the `.apworld`.
+  Local sources (a file committed into the index repo) are no longer accepted.
+- **Not banned on the Archipelago Discord** for copyright reasons.
+- **No large unknown executable binary blobs**, and no dependency on any.
+- **No use of remote resources during generation** — no update checks, no downloads, nothing
+  that touches the network. This constrains generation only; the client's file transport and
+  its network callbacks are a separate concern.
+- **No ROM required to generate.** Worlds already in the index are exempt; new ones are not.
+- **No forced interactivity during generation** — nothing that blocks waiting on input.
+- **No obvious logic flaws** that make large multiworlds hard to generate. Direct use of the
+  global `random` module is called out by name (see the correctness rules above), as are test
+  failures "deemed problematic".
+- **Generation failure rate below 1%**, measured with Eijebong's fuzzer, not counting
+  `OptionError`s. It is measured with `empty-apworld` (<https://github.com/ionium-ap/empty-apworld>,
+  100 free locations) present in the same multiworld, so that failures caused by a restrictive
+  start are separated from real logic problems — anything still failing points at logic.
+- **A beta of a core-verified game needs a distinct game name** (`LADX` -> `LADX beta`).
+  Not applicable here.
+- Failures occurring early, before `generate_basic`, may be excused, since YAML validation
+  catches those cheaply and they cost little generation time.
+
+### The fuzzer checks that count toward the 1%
+
+Eijebong's fuzzer (<https://github.com/ionium-ap/Archipelago-fuzzer>) is a single `fuzz.py`
+entry point plus a `hooks/` folder; each check below is one hook in that folder.
+
+- `gerpocalypse` — Generic Entrance Randomization compatibility.
+- `indirect_conditions` — entrance access rules that need `register_indirect_condition`.
+- `item_location_count` — item pool size matches the fillable location count.
+- `detect_rule_variable_capture_issues` — late-binding closures in rules built inside a loop.
+- `check_placement_item_location_references` — `item.location` and `location.item` agree.
+- `detect_output_placement_changes` — a world must not change placements in output/stage steps.
+
+Run at merge time and worth passing, but not counted toward the 1%:
+
+- `determinism` — the same seed with the same YAMLs must produce the same result every run.
+- Universal Tracker compatibility.
+
+### Running the fuzzer
+
+The fuzzer requires Archipelago **running from source**, with `fuzz.py` copied to the root of
+that source tree. That collides with the rule above forbidding writes inside `Archipelago/`,
+and the fuzzer is a third repository rather than something vendored here. **No workflow for
+this has been established yet** — do not assume a location, a checkout, or a submodule. Ask.
+
+Invocation, for reference:
+`python fuzz.py -r 100 -j 16 -g khimera_damg -n 1` — `-r` generations (mandatory), `-j` parallel
+jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout, `--hook module:class`.
+Output lands in `./fuzz_output` relative to the Archipelago source root.
+
+### Index entry format, for when 0.1.0 ships
+
+One `index/khimera_damg.toml` in the index repo. `name` must match the game name exactly as it
+appears in a player YAML. `home` should link to the Discord thread, else the GitHub repo.
+Every key in `[versions]` must be valid semver even if the release itself is not. The preferred
+form is a global `default_url` templated with `{{version}}` plus bare `"0.1.0" = {}` entries,
+which only works if release tags are plain semver — worth deciding before the first tag.
+
+Per-world option constraints, if the fuzzer needs them to avoid rolling invalid combinations,
+live in a `fuzz-meta/khimera_damg.yaml` in the index repo, not here.
 
 ## Other information
 

@@ -1,0 +1,12 @@
+# AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.
+#
+# Fuzz constraints for khimera_damg, in the format read by Eijebong's fuzzer
+# (https://github.com/ionium-ap/Archipelago-fuzzer) via its -m flag. Mirrors the path the
+# ionium index itself uses (fuzz-meta/khimera_damg.yaml), so this file can be copied there
+# directly if the index ever needs one.
+#
+# Currently empty: every option in worlds/khimera_damg/generation_options.py is either a
+# single-value Choice (VictoryCondition) or an independent Toggle (the four shuffle_*
+# options), so there are no invalid option combinations to constrain yet. Add
+# fuzz_constraints here (mutually_exclusive, if_selected/must_include, etc. -- see the
+# fuzzer README) once that stops being true.
