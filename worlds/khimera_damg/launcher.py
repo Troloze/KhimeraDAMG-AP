@@ -5,28 +5,33 @@ from subprocess import Popen
 
 from . import GAME_ID
 
-#from .client import get_storage_path
+# from .client import get_storage_path
 
 # import asyncio
 
+
 class PatchInfo:
     _local_path: str
+
     def __init__(self, name: str) -> None:
         self.local_path = name
 
     @property
     def local_path(self) -> str:
         return self._local_path
+
     @local_path.setter
     def local_path(self, value: str) -> None:
         self._local_path = f"ap:{GAME_ID}/patches/{value}"
+
 
 # Currently selecting individually, a better approach would be to create
 # version ranges (i.e. from 0.0.2 to 0.1.3 use patch 0, from 0.1.4 to 0.1.7 use patch 1, ...)
 # but for the purposes of an unfinished skeleton this works fine to illustrate the point.
 version_to_patch: dict[str, PatchInfo] = {
-    "0.0.2": PatchInfo("p0.diff") # Doesn't exist yet
+    "0.0.2": PatchInfo("p0.diff")  # Doesn't exist yet
 }
+
 
 # Unimplemented Skeleton, deliberately does not work.
 class KhimeraDAMGLauncher:
@@ -36,7 +41,7 @@ class KhimeraDAMGLauncher:
 
     def launch_game(self, host_version: str) -> None:
         if self.is_game_running:
-                    return
+            return
         if not self._handle_patch(host_version):
             raise RuntimeError
         # self.game_process = Popen("game_process", cwd=str(self._get_storage_folder))
@@ -78,5 +83,5 @@ class KhimeraDAMGLauncher:
         # Hash current patched files to see if patch is the correct one for this version
         # If not, delete current data.win, and make a new data.win with the correct patch.
         # Returns false on patch failure.
-        _patch:PatchInfo = version_to_patch[host_version]
+        _patch: PatchInfo = version_to_patch[host_version]
         return True

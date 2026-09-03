@@ -52,6 +52,8 @@ string_normalization_table = str.maketrans({
 
     "…": "...",
 })
+
+
 # ruff: enable[RUF001]
 
 # Cleans up a string, transforms to ascii and replaces unknown characters with a string.

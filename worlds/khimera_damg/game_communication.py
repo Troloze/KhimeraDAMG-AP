@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import Utils
-from CommonClient import ClientStatus
+import Utils  # type: ignore
+from CommonClient import ClientStatus  # type: ignore
 
 if TYPE_CHECKING:
     from .client import KhimeraDAMGContext
 
 logger = logging.getLogger("Client")
+
 
 class KhimeraCommunicationHandler:
     # Will host the pooling thread

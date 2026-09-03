@@ -15,15 +15,16 @@ __all__ = ["KhimeraDAMGCommunicationInterface"]
 
 logger = logging.getLogger("Client")
 
+
 class KhimeraDAMGCommunicationInterface:
-    send_queue: queue.Queue[tuple[str, Any]]
-    get_queue: queue.Queue[tuple[str, Any]]
+    _send_queue: queue.Queue[tuple[str, Any]]
+    _get_queue: queue.Queue[tuple[str, Any]]
 
     def __init__(self) -> None:
-        self.send_queue = queue.Queue()
-        self.get_queue = queue.Queue()
+        self._send_queue = queue.Queue()
+        self._get_queue = queue.Queue()
         self.running = False
-        self.agent:CommunicationAgent | None = None
+        self.agent: CommunicationAgent | None = None
         self.last_heartbeat = -1
         self.session_last_ack = -1
 
@@ -31,7 +32,7 @@ class KhimeraDAMGCommunicationInterface:
         pckg: tuple[str, Any] = ("item", (order, item))
 
         try:
-            self.send_queue.put(pckg)
+            self._send_queue.put(pckg)
         except queue.ShutDown:
             pass
 
@@ -39,7 +40,7 @@ class KhimeraDAMGCommunicationInterface:
         pckg: tuple[str, Any] = ("location", location_id)
 
         try:
-            self.send_queue.put(pckg)
+            self._send_queue.put(pckg)
         except queue.ShutDown:
             pass
 
@@ -47,22 +48,22 @@ class KhimeraDAMGCommunicationInterface:
         pckg: tuple[str, Any] = ("message", message)
 
         try:
-            self.send_queue.put(pckg)
+            self._send_queue.put(pckg)
         except queue.ShutDown:
             pass
 
     def send_death_link(self, message: str) -> None:
         pckg: tuple[str, Any] = ("death_link", message)
         try:
-            self.send_queue.put(pckg)
+            self._send_queue.put(pckg)
         except queue.ShutDown:
             pass
 
     def send_connection_status(self, is_connected: bool) -> None:
-        pckg: tuple[str, Any] = ("status",  0 if is_connected else 1)
+        pckg: tuple[str, Any] = ("status", 0 if is_connected else 1)
 
         try:
-            self.send_queue.put(pckg)
+            self._send_queue.put(pckg)
         except queue.ShutDown:
             pass
 
@@ -78,8 +79,8 @@ class KhimeraDAMGCommunicationInterface:
             self.agent.open_communication(
                 connection_context=connection_context,
                 location_information=location_information,
-                htg_q=self.send_queue,
-                gth_q=self.get_queue
+                htg_q=self._send_queue,
+                gth_q=self._get_queue
             )
         )
         try:
@@ -91,13 +92,13 @@ class KhimeraDAMGCommunicationInterface:
                 # This interface is permanently stopped, create a new one to try again.
                 self.running = False
                 self.agent.close_communication()
-                self.send_queue.shutdown()
-                self.get_queue.shutdown()
+                self._send_queue.shutdown()
+                self._get_queue.shutdown()
 
     async def stop(self) -> None:
         if not self.running:
             return
-        self.send_queue.shutdown()
+        self._send_queue.shutdown()
         self.running = False
         # Should stop itself after turning running to false.
         # May keep feeding get_queue after a while if this happens while
@@ -112,7 +113,7 @@ class KhimeraDAMGCommunicationInterface:
 
         while True:
             try:
-                incoming_data.append(self.get_queue.get_nowait())
+                incoming_data.append(self._get_queue.get_nowait())
             except queue.Empty:
                 break
             except queue.ShutDown:
@@ -144,6 +145,6 @@ class KhimeraDAMGCommunicationInterface:
         return (ri, rs)
 
     async def probe_game_status(self, host_world_version: str, timeout: float = 1.0) -> bool:
-        agent = get_agent(host_world_version)() # Initialized, not started.
+        agent = get_agent(host_world_version)()  # Initialized, not started.
         # Could raise
         return await agent.on_game_status_update(timeout=timeout)

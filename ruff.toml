@@ -9,8 +9,12 @@ extend-unsafe-fixes = [
     "PLC1802",
     "PLC1901"
 ]
-extend-select = ["E301", "E302", "E303", "E305", "E306", "E117", "ANN", "A"]
+extend-select = [
+    "ANN", 
+    "A"
+]
 ignore = [
+    # Archipelago
     "B011",  # In AP, the use of assert False is essential because we optimise out these statements for release builds.
     "C901",  # Author disagrees with limiting branch complexity 
     # "N818",  # Author agrees with this rule, but Core AP violates this and changing it would be a hassle.
@@ -19,4 +23,14 @@ ignore = [
     # "PLC1901",  # This is just not equivalent
     "PLE1141",  # Gives false positives when the dict keys are tuples, but does not mention this in the suggested fix.
     "UP015",  # Explicit is better than implicit, so we'd prefer to keep "r" in open() calls.
-]
+    
+    # Khimera's
+    "ANN401", # Any exists for a reason and I intend to use it.
+    "RUF067", # It is common practice for __init__ to contain world stuff in archipelago, I do not intend to go against it.
+    "PLC2801", # Necessary to use object.__setattr__ when making dataclass sanitizer functions.
+    "PLC1901", # Author agrees with this rule
+    "RUF106", # Author believes codes are more convenient than description.
+
+    # Testing
+    # "A001",
+] 

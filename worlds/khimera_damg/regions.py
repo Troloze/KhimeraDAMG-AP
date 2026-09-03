@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from BaseClasses import CollectionRule, Region
+from BaseClasses import CollectionRule, Region  # type: ignore
 
 from .types import (
     KhimeraDAMGItem,
@@ -15,10 +15,11 @@ from .types import (
 if TYPE_CHECKING:
     from . import KhimeraDAMGWorld
 
-def create_regions(world: "KhimeraDAMGWorld"):
+
+def create_regions(world: "KhimeraDAMGWorld") -> None:
     world_map = create_region(world, "Map")
-    regions:dict[str, Region] = {}
-    region_stages:dict[str, StageIndex] = {}
+    regions: dict[str, Region] = {}
+    region_stages: dict[str, StageIndex] = {}
 
     for stage, name in stage_id_to_name.items():
         if stage in [StageIndex.GENERAL, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
@@ -37,28 +38,29 @@ def create_regions(world: "KhimeraDAMGWorld"):
     for name, region in regions.items():
         assign_locations_to_region(world, region, region_stages[name])
 
+
 def assign_locations_to_region(world: "KhimeraDAMGWorld", region: Region, stage: StageIndex) -> None:
     from .locations import books, clears, detonators, fairies, gourmet_gal, minibosses, upgrades
     locations = {}
     event_locations = {}
-    locations |= {name: data.id for name, data in clears if data.stage == stage}
-    locations |= {name: data.id for name, data in upgrades if data.stage == stage}
-    locations |= {name: data.id for name, data in minibosses if data.stage == stage}
+    locations |= {name: data.location_id for name, data in clears if data.stage == stage}
+    locations |= {name: data.location_id for name, data in upgrades if data.stage == stage}
+    locations |= {name: data.location_id for name, data in minibosses if data.stage == stage}
 
     if world.options.shuffle_books:
-        locations |= {name: data.id for name, data in books if data.stage == stage}
+        locations |= {name: data.location_id for name, data in books if data.stage == stage}
 
     if world.options.shuffle_fairies:
-        locations |= {name: data.id for name, data in fairies if data.stage == stage}
+        locations |= {name: data.location_id for name, data in fairies if data.stage == stage}
     else:
         if world.options.shuffle_books:
             event_locations |= {name: "Fairy" for name, data in fairies if data.stage == stage}
 
     if world.options.shuffle_detonators:
-        locations |= {name: data.id for name, data in detonators if data.stage == stage}
+        locations |= {name: data.location_id for name, data in detonators if data.stage == stage}
 
     if world.options.shuffle_gourmet_gal:
-        locations |= {name: data.id for name, data in gourmet_gal if data.stage == stage}
+        locations |= {name: data.location_id for name, data in gourmet_gal if data.stage == stage}
 
     region.add_locations(locations, KhimeraDAMGLocation)
 
@@ -72,19 +74,20 @@ def assign_locations_to_region(world: "KhimeraDAMGWorld", region: Region, stage:
         )
 
 
-def create_region(world: "KhimeraDAMGWorld", name:str) -> Region:
-    reg:Region = Region(name, world.player, world.multiworld)
+def create_region(world: "KhimeraDAMGWorld", name: str) -> Region:
+    reg: Region = Region(name, world.player, world.multiworld)
     world.multiworld.regions.append(reg)
     return reg
 
+
 def create_and_connect_region(
     world: "KhimeraDAMGWorld",
-    name:str,
-    entrance_name:str,
+    name: str,
+    entrance_name: str,
     connected_region: Region,
-    stage_lock: StageIndex|None = None
+    stage_lock: StageIndex | None = None
 ) -> Region:
-    new_region:Region = create_region(world, name)
+    new_region: Region = create_region(world, name)
     is_shuffle_detonators = world.options.shuffle_detonators
 
     extra_stages = [StageIndex.ICY_PATH, StageIndex.BRINE_CAVE, StageIndex.TOWER_OF_POWER, StageIndex.WINDY_WAY]

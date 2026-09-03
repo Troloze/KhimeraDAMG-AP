@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from BaseClasses import ItemClassification
+from BaseClasses import ItemClassification  # type: ignore
 
 from .types import (
     ItemData,
@@ -17,11 +17,13 @@ if TYPE_CHECKING:
 
 ItemDict = dict[str, ItemData]
 
+
 def make_item_id(item_type: ItemType, index: int) -> int:
     return (5000 + item_type.value) * 100000 + index
 
+
 # ruff: disable[E501]
-upgrades:ItemDict = {
+upgrades: ItemDict = {
     "Saucy Shot":       ItemData(make_item_id(ItemType.SKILLS, 1), ItemClassification.useful),
     "Mermaid Anchor":   ItemData(make_item_id(ItemType.SKILLS, 2), ItemClassification.useful),
     "Harpy Boost":      ItemData(make_item_id(ItemType.SKILLS, 3), ItemClassification.useful),
@@ -32,7 +34,7 @@ upgrades:ItemDict = {
     "Wicked Eye":       ItemData(make_item_id(ItemType.SKILLS, 8), ItemClassification.useful)
 }
 
-stage_unlocks:ItemDict = {
+stage_unlocks: ItemDict = {
     stage_entrances[StageIndex.RAGAZZA_TOWN]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 1), ItemClassification.progression),
     stage_entrances[StageIndex.CHELSHIAS_HOUSE]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 2), ItemClassification.progression),
     stage_entrances[StageIndex.FAIRIES_DOMAIN]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 3), ItemClassification.progression),
@@ -51,12 +53,12 @@ stage_unlocks:ItemDict = {
     stage_entrances[StageIndex.WINDY_WAY]:              ItemData(make_item_id(ItemType.STAGE_UNLOCK, 16), ItemClassification.progression),
 }
 
-fairies:ItemDict = {
+fairies: ItemDict = {
     "Fairy": ItemData(make_item_id(ItemType.FAIRY, 1), ItemClassification.filler)
 }
 
 # Harvest event log books will be placed in a separate category when implemented, but are all books regardless.
-books:ItemDict = {
+books: ItemDict = {
     "Log Book: Chelshia":               ItemData(make_item_id(ItemType.BOOK, 1), ItemClassification.filler),
     "Log Book: The Professor":          ItemData(make_item_id(ItemType.BOOK, 2), ItemClassification.filler),
     "Log Book: Bernadette":             ItemData(make_item_id(ItemType.BOOK, 3), ItemClassification.filler),
@@ -97,21 +99,21 @@ books:ItemDict = {
     "Log Book: Cakeboy":                ItemData(make_item_id(ItemType.BOOK, 38), ItemClassification.filler)
 }
 
-detonators:ItemDict = {
+detonators: ItemDict = {
     stage_to_detonator_item_index[StageIndex.ICY_PATH]:         ItemData(make_item_id(ItemType.DETONATOR, 1), ItemClassification.progression),
     stage_to_detonator_item_index[StageIndex.BRINE_CAVE]:       ItemData(make_item_id(ItemType.DETONATOR, 2), ItemClassification.progression),
     stage_to_detonator_item_index[StageIndex.TOWER_OF_POWER]:   ItemData(make_item_id(ItemType.DETONATOR, 3), ItemClassification.progression),
     stage_to_detonator_item_index[StageIndex.WINDY_WAY]:        ItemData(make_item_id(ItemType.DETONATOR, 4), ItemClassification.progression)
 }
 
-gourmet_upgrades:ItemDict = {
+gourmet_upgrades: ItemDict = {
     "Gourmet Chicken":  ItemData(make_item_id(ItemType.GOURMET_GAL, 1), ItemClassification.useful),
     "Gourmet Pizza":    ItemData(make_item_id(ItemType.GOURMET_GAL, 2), ItemClassification.useful),
     "Gourmet Burger":   ItemData(make_item_id(ItemType.GOURMET_GAL, 3), ItemClassification.useful),
     "Gourmet Calamari": ItemData(make_item_id(ItemType.GOURMET_GAL, 4), ItemClassification.useful)
 }
 
-filler:ItemDict = {
+filler: ItemDict = {
     "Coin": ItemData(make_item_id(ItemType.FILLER, 1), ItemClassification.filler),
     "Small Gem": ItemData(make_item_id(ItemType.FILLER, 2), ItemClassification.filler),
     "Gem": ItemData(make_item_id(ItemType.FILLER, 3), ItemClassification.filler),
@@ -119,7 +121,7 @@ filler:ItemDict = {
     "Food": ItemData(make_item_id(ItemType.FILLER, 5), ItemClassification.filler),
 }
 
-filler_weights:dict[str, int] = {
+filler_weights: dict[str, int] = {
     "Coin": 30,
     "Small Gem": 20,
     "Gem": 10,
@@ -127,17 +129,20 @@ filler_weights:dict[str, int] = {
     "Food": 5
 }
 
+
 # Ensure parity between filler and filler_weights, checked at apworld loading so it is caught early on testing.
 def validate_filler() -> None:
     if not filler.keys() == filler_weights.keys():
         raise ValueError("filler and filler_weights have different keys.")
+
+
 validate_filler()
 
-filler_item_names:list[str] = list(filler_weights.keys())
-filler_item_weights:list[int] = list(filler_weights.values())
+filler_item_names: list[str] = list(filler_weights.keys())
+filler_item_weights: list[int] = list(filler_weights.values())
 
 # Not currently added to item table; the first alpha release won't have traps.
-traps:ItemDict = {
+traps: ItemDict = {
     "Cannonball Trap": ItemData(make_item_id(ItemType.TRAPS, 1), ItemClassification.trap),
     "Floof Aviator Swarm Trap": ItemData(make_item_id(ItemType.TRAPS, 2), ItemClassification.trap),
     "Kiran Drive-By Trap": ItemData(make_item_id(ItemType.TRAPS, 3), ItemClassification.trap),
@@ -167,22 +172,26 @@ item_table = {
 
 # ruff: enable[E501]
 
+
 def update_item_classification(world: "KhimeraDAMGWorld") -> None:
     if world.options.shuffle_books:
         world.progression_overrides["Harpy Boost"] = ItemClassification.progression
         if world.options.shuffle_fairies:
             world.progression_overrides["Fairy"] = ItemClassification.progression_deprioritized_skip_balancing
 
+
 def get_filler(world: "KhimeraDAMGWorld") -> str:
     # No trap logic yet
     return world.random.choices(filler_item_names, weights=filler_item_weights)[0]
 
-def create_item(world: "KhimeraDAMGWorld", name) -> KhimeraDAMGItem:
+
+def create_item(world: "KhimeraDAMGWorld", name: str) -> KhimeraDAMGItem:
     data = item_table[name]
     classification = data.type
     if name in world.progression_overrides:
         classification = world.progression_overrides[name]
-    return KhimeraDAMGItem(name, classification, data.id, world.player)
+    return KhimeraDAMGItem(name, classification, data.item_id, world.player)
+
 
 def create_items(world: "KhimeraDAMGWorld") -> None:
     itempool: list[KhimeraDAMGItem] = []
@@ -229,4 +238,3 @@ def create_items(world: "KhimeraDAMGWorld") -> None:
     if filler_count > 0:
         for _ in range(filler_count):
             world.multiworld.itempool.append(world.create_filler())
-

@@ -1,10 +1,10 @@
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
-from BaseClasses import ItemClassification, Tutorial
-from worlds.AutoWorld import WebWorld, World
-from worlds.LauncherComponents import Component, Type, components, icon_paths
-from worlds.LauncherComponents import launch as launch_component
+from BaseClasses import ItemClassification, Tutorial  # type: ignore
+from worlds.AutoWorld import WebWorld, World  # type: ignore
+from worlds.LauncherComponents import Component, Type, components, icon_paths  # type: ignore
+from worlds.LauncherComponents import launch as launch_component  # type: ignore
 
 from .generation_options import KhimeraDAMGOptions, create_option_groups
 from .items import create_item, create_items, get_filler, item_groups, item_table, update_item_classification
@@ -15,9 +15,11 @@ from .types import KhimeraDAMGItem, StageIndex
 APWORLD_VERSION: str = "0.0.2"
 GAME_ID: str = "khimera_damg"
 
+
 def client_launch(*args: str) -> None:
     from .client import launch
     launch_component(launch, name="KhimeraDAMGClient", args=args)
+
 
 components.append(
     Component(
@@ -43,7 +45,7 @@ class WebKhimeraDAMG(WebWorld):
     theme = "stone"
     option_groups = create_option_groups()
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.tutorials = [Tutorial(
                 "Multiworld Setup Guide",
                 "A guide for setting up Khimera: Destroy All Monster Girls to be played in Archipelago.",
@@ -53,21 +55,21 @@ class WebKhimeraDAMG(WebWorld):
                 ["Troloze"]
         )]
 
+
 class KhimeraDAMGWorld(World):
     game = "Khimera: Destroy All Monster Girls"
     origin_region_name = "Map"
     required_client_version = (0, 6, 7)
-    item_name_to_id:ClassVar[dict[str, int]] = {name: data.id for name, data in item_table.items()}
-    location_name_to_id:ClassVar[dict[str, int]] = {name: data.id for name, data in loc_table.items()}
+    item_name_to_id: ClassVar[dict[str, int]] = {name: data.item_id for name, data in item_table.items()}
+    location_name_to_id: ClassVar[dict[str, int]] = {name: data.location_id for name, data in loc_table.items()}
     item_name_groups = item_groups
     options_dataclass = KhimeraDAMGOptions
-    options: KhimeraDAMGOptions # type: ignore
+    options: KhimeraDAMGOptions  # type: ignore
     web = WebKhimeraDAMG()
-
 
     def generate_early(self) -> None:
         self.starting_locations = starting_locations
-        self.progression_overrides:dict[str, ItemClassification] = {}
+        self.progression_overrides: dict[str, ItemClassification] = {}
         update_item_classification(self)
         return super().generate_early()
 
@@ -105,5 +107,3 @@ class KhimeraDAMGWorld(World):
 
     def create_item(self, name: str) -> KhimeraDAMGItem:
         return create_item(self, name)
-
-

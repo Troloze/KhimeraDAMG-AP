@@ -17,8 +17,9 @@ from ..classes import CommunicationAgent, CommunicationContract
 
 logger = logging.getLogger("Client")
 
+
 class AgentV1(CommunicationAgent):
-    cleanup_target_files: ClassVar[list[str]] = [
+    _cleanup_target_files: ClassVar[list[str]] = [
         "ap.cctx",
         "ap.cctx.tmp",
         "ap.cctx.rd",
@@ -35,7 +36,7 @@ class AgentV1(CommunicationAgent):
         "ap.cs.tmp"
     ]
 
-    shutdown_cleanup_exclude: ClassVar[list[str]] = [
+    _shutdown_cleanup_exclude: ClassVar[list[str]] = [
         "ap.gi.tmp"  # Not included since game produced tmp files should be invisible to the client
     ]
 
@@ -45,7 +46,7 @@ class AgentV1(CommunicationAgent):
             current_value = None
             while True:
                 await asyncio.sleep(0.1)
-                raw = self.read_file("ap.gs", status=True)
+                raw = self._read_file("ap.gs", status=True)
                 current_value = self.contract.read_content("gs", raw)["heartbeat"] if raw is not None else None
                 if current_value is None or current_value < 0:
                     continue
@@ -76,17 +77,17 @@ class AgentV1(CommunicationAgent):
         htg_q: queue.Queue,
         gth_q: queue.Queue
     ) -> None:
-        self.htg_q = htg_q # Host-to-Game Queue (send)
-        self.gth_q = gth_q # Game-to-Host Queue (get)
+        self.htg_q = htg_q  # Host-to-Game Queue (send)
+        self.gth_q = gth_q  # Game-to-Host Queue (get)
         if htg_q.is_shutdown or gth_q.is_shutdown:
             raise ValueError("One of the provided queues has been shutdown.")
 
         # Cleanup
-        self.on_start()
+        self._on_start()
 
         try:
-            await self.send_connection_context(connection_context)
-            await self.send_location_information(location_information)
+            await self._send_connection_context(connection_context)
+            await self._send_location_information(location_information)
         except OSError as err:
             # Do not start threads, handle this later.
             cctx_path = self.sandbox / "ap.cctx"
@@ -101,7 +102,7 @@ class AgentV1(CommunicationAgent):
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
         threading.Thread(
-            target=self.consume_incomming,
+            target=self._consume_incomming,
             name="KhimeraDAMG Communication Consumer Loop",
             daemon=True
         ).start()
@@ -130,11 +131,11 @@ class AgentV1(CommunicationAgent):
         self.communication_opened = False
         self.communication_closed = False
         self.last_connection_status = 1
-        self.test_sandbox_access() # Needs to be on init so game status update can be detected.
+        self._test_sandbox_access()  # Needs to be on init so game status update can be detected.
         self.thread_exit = threading.Event()
 
-    def on_start(self) -> None:
-        for file in self.cleanup_target_files:
+    def _on_start(self) -> None:
+        for file in self._cleanup_target_files:
             file_path = self.sandbox / file
             try:
                 file_path.unlink(missing_ok=True)
@@ -142,8 +143,8 @@ class AgentV1(CommunicationAgent):
                 # Leftover data that couldn't be deleted, the readers and writers can handle these.
                 continue
 
-    def on_exit(self) -> None:
-        for file in [entry for entry in self.cleanup_target_files if entry not in self.shutdown_cleanup_exclude]:
+    def _on_exit(self) -> None:
+        for file in [entry for entry in self._cleanup_target_files if entry not in self._shutdown_cleanup_exclude]:
             file_path = self.sandbox / file
             try:
                 file_path.unlink(missing_ok=True)
@@ -151,7 +152,7 @@ class AgentV1(CommunicationAgent):
                 # Leftover data that will need to be handled on startup next session
                 continue
 
-    def consumer(self, heartbeat: int) -> tuple[RuntimeInformation, RuntimeStatus] | None:
+    def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, RuntimeStatus] | None:
         if self.communication_closed or self.htg_q is None or self.htg_q.is_shutdown:
             return None
 
@@ -190,38 +191,38 @@ class AgentV1(CommunicationAgent):
 
         return (ri, rs)
 
-    def consume_incomming(self) -> None:
+    def _consume_incomming(self) -> None:
         tick_count = 0
         try:
             while not self.communication_closed:
                 started = time.perf_counter()
-                queue_values = self.consumer(tick_count)
+                queue_values = self._consumer(tick_count)
                 tick_count += 1
                 if queue_values is not None:
                     try:
-                        self.send_connection_status(queue_values[1])
+                        self._send_connection_status(queue_values[1])
                     except Exception:
                         logger.exception("Failed to update connection status.")
                     try:
-                        self.receive_game_status()
+                        self._receive_game_status()
                     except Exception:
                         logger.exception("Failed to receive game status.")
                     try:
-                        self.receive_game_information()
+                        self._receive_game_information()
                     except Exception:
                         logger.exception("Failed to receive game information.")
                     try:
-                        self.send_host_information(queue_values[0])
+                        self._send_host_information(queue_values[0])
                     except Exception:
                         logger.exception("Failed to send host information.")
                 time.sleep(max(0.0, self.contract.tick_time - (time.perf_counter() - started)))
         finally:
             try:
-                self.on_exit()
+                self._on_exit()
             finally:
                 self.thread_exit.set()
 
-    def test_sandbox_access(self) -> None:
+    def _test_sandbox_access(self) -> None:
         def loop() -> None:
             if not self.sandbox.is_dir():
                 self.sandbox.mkdir(parents=True, exist_ok=True)
@@ -244,7 +245,7 @@ class AgentV1(CommunicationAgent):
                 continue
             break
 
-    def write_file(self, name: str, data: str, status: bool = False) -> bool:
+    def _write_file(self, name: str, data: str, status: bool = False) -> bool:
         base_path = self.sandbox / name
         tmp_path = self.sandbox / f"{name}.tmp"
         if not status:
@@ -258,7 +259,7 @@ class AgentV1(CommunicationAgent):
 
         return True
 
-    def read_file(self, name: str, status: bool = False) -> str | None:
+    def _read_file(self, name: str, status: bool = False) -> str | None:
         base_path = self.sandbox / name
         rd_path = self.sandbox / f"{name}.rd"
         old_data: str | None = None
@@ -335,27 +336,27 @@ class AgentV1(CommunicationAgent):
 
         return data
 
-    async def send_connection_context(self, cctx: ConnectionContext) -> None:
+    async def _send_connection_context(self, cctx: ConnectionContext) -> None:
         message, _exit_code = self.contract.write_content("cctx", cctx.to_dict())
         # Doesn't need buffer, just resend the same data in case of error.
         attempts = 0
-        while not self.write_file("ap.cctx", message):
+        while not self._write_file("ap.cctx", message):
             attempts += 1
             await asyncio.sleep(1.0)
-            if attempts >= 5: # hardcoded for now, might include in the contract later
+            if attempts >= 5:  # hardcoded for now, might include in the contract later
                 raise OSError("Could not write connection context.")
 
-    async def send_location_information(self, li: LocationInformation) -> None:
+    async def _send_location_information(self, li: LocationInformation) -> None:
         message, _exit_code = self.contract.write_content("li", li.to_dict())
         # Doesn't need buffer, just resend the same data.
         attempts = 0
-        while not self.write_file("ap.li", message):
+        while not self._write_file("ap.li", message):
             attempts += 1
             await asyncio.sleep(1.0)
             if attempts >= 5:
                 raise OSError("Could not write location information.")
 
-    def send_host_information(self, hi: RuntimeInformation) -> None:
+    def _send_host_information(self, hi: RuntimeInformation) -> None:
         hi = hi.merge(self.host_information_buffer, merger_first=True)
         cap = self.contract.max_messages_per_tick
 
@@ -379,19 +380,19 @@ class AgentV1(CommunicationAgent):
 
         message, _exit_code = self.contract.write_content("hi", self.host_information_buffer.to_dict("host"))
 
-        if self.write_file("ap.hi", message):
+        if self._write_file("ap.hi", message):
             self.host_information_buffer = None
 
-    def send_connection_status(self, gs: RuntimeStatus) -> None:
+    def _send_connection_status(self, gs: RuntimeStatus) -> None:
         message, _exit_code = self.contract.write_content("cs", gs.to_dict())
         # Doesn't need a buffer or a loop.
-        self.write_file("ap.cs", message, status=True)
+        self._write_file("ap.cs", message, status=True)
 
-    def receive_game_information(self) -> None:
+    def _receive_game_information(self) -> None:
         if self.gth_q is None or self.gth_q.is_shutdown:
             return
 
-        raw: str | None = self.read_file("ap.gi")
+        raw: str | None = self._read_file("ap.gi")
         # Could not open file, try again next tick.
         if raw is None:
             return
@@ -401,28 +402,28 @@ class AgentV1(CommunicationAgent):
         death_link: list[str] = game_information["death_link"]
         ack: int = game_information["ack"]
         is_win: bool = game_information["is_win"]
-        _exit_code: int = game_information["exit_code"] # Currently does nothing
+        _exit_code: int = game_information["exit_code"]  # Currently does nothing
 
         for entry in locations:
             self.gth_q.put(("location", entry))
         for entry in death_link:
             self.gth_q.put(("death_link", entry))
-        if ack != -1: # Corrupted acks should be ignored.
+        if ack != -1:  # Corrupted acks should be ignored.
             self.gth_q.put(("ack", ack))
         self.gth_q.put(("is_win", is_win))
 
-    def receive_game_status(self) -> None:
+    def _receive_game_status(self) -> None:
         if self.gth_q is None or self.gth_q.is_shutdown:
             return
 
-        raw: str | None = self.read_file("ap.gs", status=True)
+        raw: str | None = self._read_file("ap.gs", status=True)
         # Could not open file, try again next tick.
         if raw is None:
             return
 
         game_status = self.contract.read_content("gs", raw)
         heartbeat = game_status["heartbeat"]
-        _exit_code: int = game_status["exit_code"] # Currently does nothing
+        _exit_code: int = game_status["exit_code"]  # Currently does nothing
 
-        if heartbeat != -1: # Corrupted heartbeats should be ignored
+        if heartbeat != -1:  # Corrupted heartbeats should be ignored
             self.gth_q.put(("heartbeat", heartbeat))

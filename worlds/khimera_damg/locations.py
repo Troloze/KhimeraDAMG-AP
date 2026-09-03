@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from BaseClasses import Region
-from rule_builder.rules import Has, Rule
+from BaseClasses import Region  # type: ignore
+from rule_builder.rules import Has, Rule  # type: ignore
 
 from .generation_options import VictoryCondition
 from .types import (
@@ -23,7 +23,7 @@ LocList = list[LocTuple]
 
 # Name is generated following the convention described in "Item and Location Conventions.md".
 # It is available at the docs folder in the apworld github repository
-def _make_name(stage: StageIndex, loc_type:LocType | str, identifier: str | None = None) -> str:
+def _make_name(stage: StageIndex, loc_type: LocType | str, identifier: str | None = None) -> str:
     name = ""
     if stage != StageIndex.GENERAL:
         name = f"{name}{stage_id_to_name[stage]}: "
@@ -35,20 +35,22 @@ def _make_name(stage: StageIndex, loc_type:LocType | str, identifier: str | None
         name = f"{name} - {identifier}"
     return name
 
+
 def _make_data(
     stage: StageIndex,
-    loc_type:LocType,
+    loc_type: LocType,
     identifier: int,
     rule: Rule | None = None
 ) -> LocData:
     if identifier == 0:
         raise ValueError("Location ID identifier segment cannot be 0.")
-    id = stage.value * 10000000 + loc_type.value * 100000 + identifier
-    return LocData(id, stage, rule)
+    data_id = stage.value * 10000000 + loc_type.value * 100000 + identifier
+    return LocData(data_id, stage, rule)
+
 
 def _make_loc(
         stage: StageIndex,
-        loc_type:LocType,
+        loc_type: LocType,
         identifier: int,
         description: str | None = None,
         type_description: str | None = None,
@@ -58,9 +60,10 @@ def _make_loc(
     data = _make_data(stage, loc_type, identifier, rule=rule)
     return (name, data)
 
-boss_encounter_alias:str = f"{loc_type_to_name[LocType.MINIBOSS]} (?)"
 
-minibosses:LocList = [
+boss_encounter_alias: str = f"{loc_type_to_name[LocType.MINIBOSS]} (?)"
+
+minibosses: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.MINIBOSS, 1, "Versus Pirates"),
     _make_loc(StageIndex.MT_AFROKUPA, LocType.MINIBOSS, 1, "Versus Wednesday"),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.MINIBOSS, 1, "Versus Thursday"),
@@ -76,7 +79,7 @@ minibosses:LocList = [
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 5, "Versus Mimi", boss_encounter_alias),
 ]
 
-clears:LocList = [
+clears: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 1),
@@ -92,7 +95,7 @@ clears:LocList = [
     _make_loc(StageIndex.WINDY_WAY, LocType.STAGE_CLEAR, 1),
 ]
 
-upgrades:LocList = [
+upgrades: LocList = [
     _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 2, "Saucy Shot Upgrade"),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 2, "Mermaid Anchor Upgrade"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.STAGE_CLEAR, 2, "Harpy Boost Upgrade"),
@@ -104,7 +107,7 @@ upgrades:LocList = [
     _make_loc(StageIndex.WINDY_WAY, LocType.STAGE_CLEAR, 2, "Wicked Eye Upgrade"),
 ]
 
-fairies:LocList = [
+fairies: LocList = [
     _make_loc(StageIndex.RAGAZZA_TOWN, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.RAGAZZA_TOWN, LocType.FAIRY, 2, "2"),
 
@@ -141,7 +144,7 @@ fairies:LocList = [
 ]
 
 # Harvest event books will be stored separately when implemented.
-books:LocList = [
+books: LocList = [
     _make_loc(StageIndex.RAGAZZA_TOWN, LocType.BOOK, 1, "1 (Scuttlebit)",
               rule=Has("Harpy Boost")),
     _make_loc(StageIndex.RAGAZZA_TOWN, LocType.BOOK, 2, "2 (Nyazione)"),
@@ -150,7 +153,7 @@ books:LocList = [
 
     _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 1, "1 (Gourmet Gal)"),
     _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 2, "2 (The Fairy Queen)",
-              rule=Has("Fairy",count=12)),
+              rule=Has("Fairy", count=12)),
 
     _make_loc(StageIndex.QUIZ, LocType.BOOK, 1, "1 (Mouthface)"),
 
@@ -200,24 +203,26 @@ books:LocList = [
     _make_loc(StageIndex.CAKEBOY, LocType.BOOK, 1, "1 (Cakeboy)"),
 ]
 
-detonators:LocList = [
+detonators: LocList = [
     _make_loc(StageIndex.MT_AFROKUPA, LocType.DETONATOR, 1),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.DETONATOR, 1),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.DETONATOR, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.DETONATOR, 1),
 ]
 
-gourmet_gal:LocList = [
+gourmet_gal: LocList = [
     _make_loc(StageIndex.MT_AFROKUPA, LocType.GOURMET_GAL, 1),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.GOURMET_GAL, 1),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.GOURMET_GAL, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.GOURMET_GAL, 1),
 ]
 
+
 def _make_loc_table(locs: LocList) -> dict[str, LocData]:
     return dict(locs)
 
-loc_table:dict[str, LocData] = _make_loc_table(
+
+loc_table: dict[str, LocData] = _make_loc_table(
     clears
     + minibosses
     + upgrades
@@ -227,11 +232,13 @@ loc_table:dict[str, LocData] = _make_loc_table(
     + gourmet_gal
 )
 
+
 def apply_location_rules(world: "KhimeraDAMGWorld") -> None:
     for location in world.get_locations():
         data = loc_table.get(location.name)
         if data is not None and data.rule is not None:
             world.set_rule(location, data.rule)
+
 
 def apply_goal_logic(world: "KhimeraDAMGWorld") -> None:
     host: Region | None = None

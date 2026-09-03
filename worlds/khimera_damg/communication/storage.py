@@ -9,6 +9,7 @@ component_list: dict[tuple[int, int, int], tuple[type[CommunicationContract], ty
     (0, 0, 0): (ContractV1, AgentV1)
 }
 
+
 def get_agent(contract_version: str) -> Callable[[], CommunicationAgent]:
     digits = tuple(map(int, contract_version.split(".")))
     if len(digits) != 3:

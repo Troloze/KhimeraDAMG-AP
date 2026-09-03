@@ -12,11 +12,14 @@ from rule_builder.rules import Rule  # type: ignore
 # =   Generation   =
 # ==================
 
+
 class KhimeraDAMGLocation(Location):
     game = "Khimera: Destroy All Monster Girls"
 
+
 class KhimeraDAMGItem(Item):
     game = "Khimera: Destroy All Monster Girls"
+
 
 class StageIndex(IntEnum):
     # Any/None/Some; Whatever doesn't fit in a single stage index goes here
@@ -50,6 +53,7 @@ class StageIndex(IntEnum):
     # Cakeboy
     CAKEBOY = 18
 
+
 class ItemType(IntEnum):
     SKILLS = 0
     STAGE_UNLOCK = 1
@@ -62,6 +66,7 @@ class ItemType(IntEnum):
     TRAPS = 8
     FILLER = 9
 
+
 class LocType(IntEnum):
     GENERAL = 0
     STAGE_CLEAR = 1
@@ -72,16 +77,19 @@ class LocType(IntEnum):
     DETONATOR = 6
     GOURMET_GAL = 7
 
+
 class LocData(NamedTuple):
-    id: int
+    location_id: int
     stage: StageIndex
     rule: Rule | None
 
+
 class ItemData(NamedTuple):
-    id: int
+    item_id: int
     type: ItemClassification
 
-stage_id_to_name:dict[StageIndex, str] = {
+
+stage_id_to_name: dict[StageIndex, str] = {
     StageIndex.GENERAL:             "General",
     StageIndex.RAGAZZA_TOWN:        "Ragazza Town",
     StageIndex.CHELSHIAS_HOUSE:     "Chelshia's House",
@@ -103,7 +111,7 @@ stage_id_to_name:dict[StageIndex, str] = {
     StageIndex.CAKEBOY:             "Cakeboy"
 }
 
-stage_entrances:dict[StageIndex, str] = {
+stage_entrances: dict[StageIndex, str] = {
     StageIndex.RAGAZZA_TOWN:        "Unlock Ragazza Town",
     StageIndex.CHELSHIAS_HOUSE:     "Unlock Chelshia's House",
     StageIndex.FAIRIES_DOMAIN:      "Unlock The Fairies Domain",
@@ -122,7 +130,7 @@ stage_entrances:dict[StageIndex, str] = {
     StageIndex.WINDY_WAY:           "Unlock Windy Way"
 }
 
-loc_type_to_name:dict[LocType, str] = {
+loc_type_to_name: dict[LocType, str] = {
     LocType.GENERAL:                "General",
     LocType.STAGE_CLEAR:            "Clear",
     LocType.MINIBOSS:               "Miniboss",
@@ -149,6 +157,7 @@ extra_to_stage_index: dict[StageIndex, StageIndex] = {
 # ==================
 # =     Client     =
 # ==================
+
 
 @dataclass(frozen=True)
 class ConnectionContext:
@@ -227,11 +236,10 @@ class RuntimeInformation:
             "is_win":       self.is_win
         }
 
-
     def merge(self, merger: RuntimeInformation | None, merger_first: bool = False) -> RuntimeInformation:
         if merger is None:
             return self
-        self.locations = self.locations.union(merger.locations) # Unions are unordered so it doesn't make a difference
+        self.locations = self.locations.union(merger.locations)  # Unions are unordered so it doesn't make a difference
         self.ack = self.ack if self.ack >= merger.ack else merger.ack
         self.is_win = self.is_win or merger.is_win
         if not merger_first:

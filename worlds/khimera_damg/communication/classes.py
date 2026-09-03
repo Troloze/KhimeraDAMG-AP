@@ -11,11 +11,14 @@ from ..types import ConnectionContext, LocationInformation
 
 logger = logging.getLogger("Client")
 
+
 class EventTypeError(TypeError):
     pass
 
+
 class EventValueError(ValueError):
     pass
+
 
 # Changes to this class should be exclusively additive, and
 # no underscored attribute names should be added here.
@@ -26,7 +29,7 @@ class CommunicationEvent:
         validate_enabled: bool = field(default=True, kw_only=True, compare=False, repr=False)
         sanitize_enabled: bool = field(default=True, kw_only=True, compare=False, repr=False)
 
-        def __post_init__(self):
+        def __post_init__(self) -> None:
             if self.invalid:
                 object.__setattr__(self, "validate_enabled", False)
                 object.__setattr__(self, "sanitize_enabled", False)
@@ -136,7 +139,6 @@ class CommunicationEvent:
                     object.__setattr__(self, value_name, sanitized_dict)
                 return
             raise EventTypeError(f"Invalid type: {type(value).__name__}")
-
 
     @dataclass(frozen=True)
     class Empty(Event):
@@ -284,10 +286,11 @@ class CommunicationEvent:
             super().__post_init__()
             self.validate_int_non_negative(self.value)
 
+
 # Changes to this class should be exclusively additive, and
 # no underscored attribute names should be added here.
 class CommunicationContract(metaclass=ABCMeta):
-    max_messages_per_tick: ClassVar[int]  = 50
+    max_messages_per_tick: ClassVar[int] = 50
     tick_time: ClassVar[float] = 0.1
 
     # Parent class for all communication contracts

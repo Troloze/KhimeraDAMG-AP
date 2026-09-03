@@ -79,19 +79,19 @@ class OptionSerializer:
             if isinstance(value, str):
                 if any(c.isspace() for c in value):
                     raise ValueError("Option list string values cannot contain whitespaces.")
-                _value = str(value)
+                typed_value = str(value)
             elif isinstance(value, int):
-                _value = int(value)
+                typed_value = int(value)
             else:
                 raise TypeError("Option lists should only contain integers or strings.")
-            ret += f" {_value}"
+            ret += f" {typed_value}"
         return ret
 
     @staticmethod
     def op_set(option: tuple[str, Any]) -> str:
         name: str = option[0]
-        values: list[str] = list(option[1]) # validates type and allows to be sorted.
-        values.sort() # Spec defines these to be sorted
+        values: list[str] = list(option[1])  # validates type and allows to be sorted.
+        values.sort()  # Spec defines these to be sorted
         ret = f"OPTION {name} L {len(values)}"
         for value in values:
             if isinstance(value, str) and any(c.isspace() for c in value):
@@ -105,7 +105,7 @@ class OptionSerializer:
         name: str = option[0]
         values: dict[str, Any] = option[1]
         ret = f"OPTION {name} D {len(values)}"
-        for key, value in sorted(values.items()): # Spec defines these to be sorted
+        for key, value in sorted(values.items()):  # Spec defines these to be sorted
             if any(c.isspace() for c in key):
                 raise ValueError("Dict keys cannot contain whitespaces")
             if isinstance(value, int):
@@ -176,12 +176,12 @@ class DataSerializer:
             if isinstance(value, str):
                 if any(c.isspace() for c in value):
                     raise ValueError("Data list string values cannot contain whitespaces.")
-                _value = str(value)
+                typed_value = str(value)
             elif isinstance(value, int):
-                _value = int(value)
+                typed_value = int(value)
             else:
                 raise TypeError("Data lists should only contain integers or strings.")
-            ret += f" {_value}"
+            ret += f" {typed_value}"
         return ret
 
     @staticmethod
@@ -189,7 +189,7 @@ class DataSerializer:
         name: str = data[0]
         values: dict[str, Any] = data[1]
         ret = f"DATA {name} D {len(values)}"
-        for key, value in sorted(values.items()): # Spec defines these to be sorted
+        for key, value in sorted(values.items()):  # Spec defines these to be sorted
             if any(c.isspace() for c in key):
                 raise ValueError("Dict keys cannot contain whitespaces")
             if isinstance(value, int):
@@ -522,7 +522,7 @@ class EventDeserializer:
             return None
         try:
             return CommunicationEvent.Ack(param_1, sanitize_enabled=False)
-        except(EventValueError, EventTypeError) as err:
+        except (EventValueError, EventTypeError) as err:
             logger.warning(f"Invalid Ack Event: {err} (params: {row})")
             return None
 
@@ -543,7 +543,7 @@ class EventDeserializer:
             return None
         try:
             return CommunicationEvent.ConnectionStatus(param_1, sanitize_enabled=False)
-        except(EventValueError, EventTypeError) as err:
+        except (EventValueError, EventTypeError) as err:
             logger.warning(f"Invalid ConnectionStatus Event: {err} (params: {row})")
             return None
 
@@ -561,7 +561,7 @@ class EventDeserializer:
 
         try:
             return CommunicationEvent.Heartbeat(param_1, sanitize_enabled=False)
-        except(EventValueError, EventTypeError) as err:
+        except (EventValueError, EventTypeError) as err:
             logger.warning(f"Invalid Heartbeat Event: {err} (params: {row})")
             return None
 
@@ -625,7 +625,43 @@ class EventDeserializer:
 
 class ContractV1(CommunicationContract):
     @classmethod
-    def write_context(cls, params: dict[str, Any]) -> tuple[str, int]:
+    def write_content(cls, content_type: str, params: dict[str, Any]) -> tuple[str, int]:
+        type_to_writer: dict[str, str] = {
+            "cctx":     "_write_context",
+            "li":       "_write_location_information",
+            "hi":       "_write_host_info",
+            "cs":       "_write_connection_state",
+        }
+        writer = type_to_writer.get(content_type)
+        if writer is None:
+            raise ValueError(f"Attempt to create unknown type of content: {content_type}")
+        return getattr(cls, writer)(params)
+
+    @classmethod
+    def read_content(cls, content_type: str, content: str) -> dict[str, Any]:
+        type_to_reader: dict[str, str] = {
+            "gi":   "_read_game_info",
+            "gs":   "_read_game_state",
+        }
+        reader = type_to_reader.get(content_type)
+        if reader is None:
+            raise ValueError(f"Attempt to read unknown type of content: {content_type}")
+        return getattr(cls, reader)(content)
+
+    @classmethod
+    def parse_events(cls, events: list[CommunicationEvent.Event]) -> tuple[str, int]:
+        return EventSerializer.serialize(events)
+
+    @classmethod
+    def parse_message(cls, msg: str) -> tuple[list[CommunicationEvent.Event], int]:
+        return EventDeserializer.parse(msg)
+
+    @classmethod
+    def get_sandbox_folder(cls) -> Path:
+        return Path(user_data_dir("khimera_ap", False))
+
+    @classmethod
+    def _write_context(cls, params: dict[str, Any]) -> tuple[str, int]:
         ap_version: str = params["ap_version"]
         host_world_version: str = params["host_world_version"]
         client_world_version: str = params["client_world_version"]
@@ -662,7 +698,7 @@ class ContractV1(CommunicationContract):
         return cls.parse_events(events)
 
     @classmethod
-    def write_location_information(cls, params: dict[str, Any]) -> tuple[str, int]:
+    def _write_location_information(cls, params: dict[str, Any]) -> tuple[str, int]:
         enabled: bool = params["enabled"]
 
         if not enabled:
@@ -679,7 +715,7 @@ class ContractV1(CommunicationContract):
         return cls.parse_events(ret)
 
     @classmethod
-    def write_connection_state(cls, params: dict[str, Any]) -> tuple[str, int]:
+    def _write_connection_state(cls, params: dict[str, Any]) -> tuple[str, int]:
         status: int = params["status"]
         heartbeat: int = params["heartbeat"]
         return cls.parse_events([
@@ -688,7 +724,7 @@ class ContractV1(CommunicationContract):
         ])
 
     @classmethod
-    def write_host_info(cls, params: dict[str, Any]) -> tuple[str, int]:
+    def _write_host_info(cls, params: dict[str, Any]) -> tuple[str, int]:
         messages: list[str] = params["messages"]
         item_list: list[tuple[int, NetworkItem]] = params["item_list"]
         death_link: list[str] = params["death_link"]
@@ -703,7 +739,7 @@ class ContractV1(CommunicationContract):
         return cls.parse_events(ret)
 
     @classmethod
-    def read_game_info(cls, msg: str) -> dict[str, Any]:
+    def _read_game_info(cls, msg: str) -> dict[str, Any]:
         parsed = cls.parse_message(msg)
         events = parsed[0]
         parse_exit_code = parsed[1]
@@ -732,7 +768,7 @@ class ContractV1(CommunicationContract):
         }
 
     @classmethod
-    def read_game_state(cls, msg: str) -> dict[str, Any]:
+    def _read_game_state(cls, msg: str) -> dict[str, Any]:
         parsed = cls.parse_message(msg)
         events = parsed[0]
         parse_exit_code = parsed[1]
@@ -744,39 +780,3 @@ class ContractV1(CommunicationContract):
             return {"heartbeat": -1, "exit_code": parse_exit_code}
 
         return {"heartbeat": events[0].value, "exit_code": parse_exit_code}
-
-    @classmethod
-    def write_content(cls, content_type: str, params: dict[str, Any]) -> tuple[str, int]:
-        type_to_writer: dict[str, str] = {
-            "cctx":     "write_context",
-            "li":       "write_location_information",
-            "hi":       "write_host_info",
-            "cs":       "write_connection_state",
-        }
-        writer = type_to_writer.get(content_type)
-        if writer is None:
-            raise ValueError(f"Attempt to create unknown type of content: {content_type}")
-        return getattr(cls, writer)(params)
-
-    @classmethod
-    def read_content(cls, content_type: str, content: str) -> dict[str, Any]:
-        type_to_reader: dict[str, str] = {
-            "gi":  "read_game_info",
-            "gs":   "read_game_state",
-        }
-        reader = type_to_reader.get(content_type)
-        if reader is None:
-            raise ValueError(f"Attempt to read unknown type of content: {content_type}")
-        return getattr(cls, reader)(content)
-
-    @classmethod
-    def parse_events(cls, events: list[CommunicationEvent.Event]) -> tuple[str, int]:
-        return EventSerializer.serialize(events)
-
-    @classmethod
-    def parse_message(cls, msg: str) -> tuple[list[CommunicationEvent.Event], int]:
-        return EventDeserializer.parse(msg)
-
-    @classmethod
-    def get_sandbox_folder(cls) -> Path:
-        return Path(user_data_dir("khimera_ap", False))

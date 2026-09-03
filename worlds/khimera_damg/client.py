@@ -4,8 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import Utils
-from CommonClient import (
+import Utils  # type: ignore
+from CommonClient import (  # type: ignore
     ClientCommandProcessor,
     ClientStatus,
     CommonContext,
@@ -15,21 +15,24 @@ from CommonClient import (
     logger,
     server_loop,
 )
-from NetUtils import JSONMessagePart, JSONtoTextParser
+from NetUtils import JSONMessagePart, JSONtoTextParser  # type: ignore
 
 from . import GAME_ID
 from .game_communication import KhimeraCommunicationHandler
 from .launcher import KhimeraDAMGLauncher
 
 if TYPE_CHECKING:
-    import kvui
+    import kvui  # type: ignore
+
 
 def get_storage_path() -> Path:
     return Path(Utils.user_path(GAME_ID))
 
+
 class KhimeraDAMGJSONToTextParser(JSONtoTextParser):
     def _handle_color(self, node: JSONMessagePart) -> str:
         return self._handle_text(node)  # No colors for the in-game text
+
 
 class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
     def _cmd_force_win(self) -> None:
@@ -37,11 +40,11 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             if self.ctx.communication_handler is not None:
                 self.ctx.communication_handler.on_goal()
 
-
     def _cmd_khimera_damg(self) -> None:
         """Check Khimera DAMG Connection State"""
         if isinstance(self.ctx, KhimeraDAMGContext):
             logger.info(f"KhimeraDAMG Status:  {'{'}\n{self.ctx.get_khimera_damg_status()}\n{'}'}")
+
 
 class KhimeraDAMGContext(CommonContext):
     command_processor = KhimeraDAMGCommandProcessor
@@ -74,7 +77,7 @@ class KhimeraDAMGContext(CommonContext):
         if self.communication_handler is not None:
             self.communication_handler.update_host_connection_status(False)
 
-    def _get_slot_data(self, args) -> bool:
+    def _get_slot_data(self, args: dict) -> bool:
         self.slot_data = args.get("slot_data", {})
         if len(self.slot_data) == 0:
             logger.warning('"slot_data" is empty, closing the connection.')
