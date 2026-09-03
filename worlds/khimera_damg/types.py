@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import NamedTuple
+from typing import Any, Literal, NamedTuple
 
-from BaseClasses import Item, ItemClassification, Location
-from rule_builder.rules import Rule
+from BaseClasses import Item, ItemClassification, Location  # type: ignore
+from NetUtils import NetworkItem  # type: ignore
+from rule_builder.rules import Rule  # type: ignore
 
+# ==================
+# =   Generation   =
+# ==================
 
 class KhimeraDAMGLocation(Location):
     game = "Khimera: Destroy All Monster Girls"
@@ -138,3 +145,101 @@ extra_to_stage_index: dict[StageIndex, StageIndex] = {
     StageIndex.TOWER_OF_POWER:  StageIndex.SKY_FORTRESS,
     StageIndex.WINDY_WAY:       StageIndex.PUMPKIN_VALLEY
 }
+
+# ==================
+# =     Client     =
+# ==================
+
+@dataclass(frozen=True)
+class ConnectionContext:
+    ap_version: str
+    host_world_version: str
+    client_world_version: str
+    slot_name: str
+    last_ack: int
+    options: dict[str, Any]
+    slot_data: dict[str, Any]
+    locations: set[int]
+    item_list: list[tuple[int, NetworkItem]]
+    has_goaled: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ap_version":           self.ap_version,
+            "host_world_version":   self.host_world_version,
+            "client_world_version": self.client_world_version,
+            "slot_name":            self.slot_name,
+            "last_ack":             self.last_ack,
+            "options":              self.options,
+            "slot_data":            self.slot_data,
+            "locations":            self.locations,
+            "item_list":            self.item_list,
+            "has_goaled":           self.has_goaled
+        }
+
+
+@dataclass(frozen=True)
+class LocationInformation:
+    enabled: bool
+    loc_info: dict[int, tuple[int, int]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled":  self.enabled,
+            "loc_info": self.loc_info
+        }
+
+
+@dataclass
+class RuntimeStatus:
+    status: int
+    heartbeat: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "heartbeat": self.heartbeat
+        }
+
+
+@dataclass
+class RuntimeInformation:
+    item_list: list[tuple[int, NetworkItem]]
+    locations: set[int]
+    messages: list[str]
+    death_link: list[str]
+    ack: int
+    is_win: bool
+
+    def to_dict(self, info_type: Literal["host", "game"]) -> dict[str, Any]:
+        if info_type == "host":
+            return {
+                "item_list":    self.item_list,
+                "locations":    self.locations,
+                "messages":     self.messages,
+                "death_link":   self.death_link
+            }
+        # elif type == "game":
+        return {
+            "locations":    self.locations,
+            "death_link":   self.death_link,
+            "ack":          self.ack,
+            "is_win":       self.is_win
+        }
+
+
+    def merge(self, merger: RuntimeInformation | None, merger_first: bool = False) -> RuntimeInformation:
+        if merger is None:
+            return self
+        self.locations = self.locations.union(merger.locations) # Unions are unordered so it doesn't make a difference
+        self.ack = self.ack if self.ack >= merger.ack else merger.ack
+        self.is_win = self.is_win or merger.is_win
+        if not merger_first:
+            self.item_list = self.item_list + merger.item_list
+            self.messages = self.messages + merger.messages
+            self.death_link = self.death_link + merger.death_link
+        else:
+            self.item_list = merger.item_list + self.item_list
+            self.messages = merger.messages + self.messages
+            self.death_link = merger.death_link + self.death_link
+        return self

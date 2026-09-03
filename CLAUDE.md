@@ -10,19 +10,23 @@ An Archipelago randomizer for *Khimera: Destroy All Monster Girls*.
 
 **This section overrides everything else in this file and any default assistant behaviour.**
 
-AI tools are used on this repository for **consultation and research only**. The human
+AI tools are used on this repository for **consultation only**. The human
 developer writes the code. Your role is to investigate, explain, and advise.
+
+For the purposes of this project "consultation" means that AI tools can be used for anything
+as long as the executable code run by the end user is 100% human written.
 
 1. **Never create, edit, rename, move, or delete any file in this repository** without
    explicit permission from the user for that specific change. There is no standing
-   permission. Approval for one change does not extend to the next one, or to "related"
-   follow-up edits you think are implied. If you believe a file needs to change, say so
-   and wait to be asked.
+   permission, even for things that won't be shipped (like documents and tests). Approval 
+   for one change does not extend to the next one, or to "related" follow-up edits you think 
+   are implied. If you believe a file needs to change, say so and wait to be asked.
 2. **Propose code in chat, do not apply it.** Suggestions are welcome and encouraged, but
    every one must explain what the code does and why it is being suggested, so the user can
-   evaluate it before deciding to write it themselves. Do not present a change as done. 
-   Do not ask the user if they would like you to sketch something after they ask you a 
-   question, only do these things if it is explicitly asked.
+   evaluate it before deciding to write it themselves. When possible, give prefference to code 
+   snippet suggestions taken from other files, and state the source. Do not present 
+   a change as done. Do not ask the user if they would like you to sketch something after 
+   they ask you a question, only do these things if it is explicitly asked.
 3. **Read-only commands and tool use are allowed** whenever they help answer a question or
    complete an assigned task — searching, inspecting files, running linters or tests,
    querying git history. Commands that modify the repository, the working tree, or git
@@ -34,6 +38,8 @@ developer writes the code. Your role is to investigate, explain, and advise.
    otherwise agreed to it.
 5. When a request is ambiguous about whether it authorises a write, assume it does not,
    and ask.
+6. Whenever the user asks you to create a file/document, always append a comment on the first
+   line stating that the artifact was AI generated.   
 
 - `worlds/khimera_damg/` — the apworld source (the thing being developed)
 - `Archipelago/` — submodule, a fork of Archipelago. Reference only; do not edit.
@@ -116,6 +122,7 @@ These cause real bugs, not just style complaints:
 
 ## Other information
 
+### Nothing to be compatible with
 This version of the apworld has not been published yet. There is no such thing as a
 "compatibility breaking change" because there is nothing for the current version to
 be compatible with yet. Assume every change made are changes to the first ever version of
@@ -123,3 +130,18 @@ the apworld, meaning compatibility checks aren't required yet.
 
 Compatibility rules will start being enforced once version 0.1.0 is properly released;
 this section will be removed by then.
+
+### Task lists
+The developper intends to focus on doing one thing at a time during development of the apworld,
+however, ideas for things unrelated to the current work will be logged for future refence and can 
+be found on docs/future reference.md and are worth bringing up once the user starts making changes 
+in the relevant section of the code.
+
+There's also a gitignored todo list on the root of the repository, these are tasks the user knows
+he needs to perform, but will leave for another session. You do not need to remind him of it, but 
+the information can be useful as context for their questions or code-review.
+
+The todo list focuses on tasks relevant to the current work, while the future reference list is 
+intended to store ideas/changes that are not relevant to the current work, and would need their own 
+pull request. Neither of them are exhaustive lists of what to do, just things the developer thought
+of while working on something else.

@@ -38,15 +38,7 @@ def create_regions(world: "KhimeraDAMGWorld"):
         assign_locations_to_region(world, region, region_stages[name])
 
 def assign_locations_to_region(world: "KhimeraDAMGWorld", region: Region, stage: StageIndex) -> None:
-    from .locations import (
-        books, 
-        clears, 
-        detonators, 
-        fairies, 
-        gourmet_gal, 
-        minibosses, 
-        upgrades
-    )
+    from .locations import books, clears, detonators, fairies, gourmet_gal, minibosses, upgrades
     locations = {}
     event_locations = {}
     locations |= {name: data.id for name, data in clears if data.stage == stage}

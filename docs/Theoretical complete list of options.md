@@ -20,6 +20,9 @@ Enum: "disabled", "other_detonators", "shuffle"
 If enabled shuffle the detonators
 "other_detonators": All detonators will act as detonators, but the mountain range exploded will be randomized.
 "shuffle": Detonators act as locations and detonator items will be shuffled into the poll
+### Shuffle Gourmet Gal
+Boolean
+All gourmet gal encounters become ap locations, adds 4 gourmet food items to the item pool.
 ### Shuffle Lucky Doll
 Enum: "false", "final-reward-only", "progressive"
 When not false, will place the Lucky Chax Doll in the item pool.
@@ -175,12 +178,8 @@ Only applies to collectables placed directly on the map, or hidden by secret wal
 ### Trap percentage:
 Integer
 The amount of filler items to be replaced with traps.
-### Enable \<trap>
-Boolean
-Adds \<trap> to the item pool.
-One of these options will exist for every trap implemented.
 ### \<trap> Weight
-Enum: "High", "Medium", "Small"
+Enum: "Huge", "High", "Medium", "Small", "Disabled"
 Determines how many of \<trap> will be added to the pool.
 One of these options will exist for every trap implemented.
 # Other Information
