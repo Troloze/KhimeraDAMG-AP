@@ -19,7 +19,7 @@ Files will have a `.tmp` attached to the end of their name on creation, and only
 
 Files that are currently being read will have a `.rd` appended by the consumer before reading.
 
-If a tick cycle is over and the file is still there, the sender will append a `.up` to the file name, rewrite the file with the old and new data, and then rename it back to its original name. A crash mid rewrite will leave the file behind, which will be cleaned up on a new launch of the client.
+The existence of the file means that it hasn't been consumed, if the file still exists at the end of a tick, buffer the data and wait for the next tick.
 ## Memory Policy
 The client will store a per seed and slot file with the last index the game has acknowledged on the user's local files, on a folder next to where the patched game will live.
 ## File Structure
@@ -40,6 +40,7 @@ Other than that, the following items should be followed:
 - Line endings should accept CRLF or LF on both the client and the game.
 - Other than the line/file endings at their correct places and the whitespace, no characters without glyphs should be written.
 - The last line on every file will be a sole dollar sign.
+	- A dollar sign in the middle of the file is to be ignored, since it can happen due to file updates.
 # Files
 ## Client Side Files:
 ### Connection Context: `ap.cctx`
@@ -97,7 +98,6 @@ The source of truth regarding connection between the client and the host.
 
 This file will not be deleted upon consumption, it will be written by the client and only read by the game, not written to. 
 The game will not append the `.rd` suffix when reading this file.
-Instead of having `.up` suffixed to the file on update, the client will instead create a new `ap.cs.tmp` file and replace the previous `ap.cs`; OS failure will simply result in another attempt after some time has passed.
 
 Message Identifiers are:
 1. `STATUS <status: int>`
@@ -107,7 +107,7 @@ Message Identifiers are:
 In its absence, the game will consider STATUS as disconnected.
 
 If the heartbeat doesn't change in a set amount of time (in seconds, not ticks), the game will treat the client as dead.
-### Host information:  `ap.in`
+### Host information:  `ap.hi`
 A list of data sent by the host to the client.
 
 Message Identifiers are:
@@ -120,15 +120,17 @@ Message Identifiers are:
 	A death link.
 	`<message>` consumes the entire rest of the row until line break.
 4. `LOC <location_id: int>`
-	Notifies the game when a location is collected by the server (autocollect on, or collect command)
+	Two purposes
+	- Resends any locations received via Game information, acting as a location ack.
+	- Notifies the game when a location is collected by the server (autocollect on, or collect command)
 
 The client will limit the amount of messages sent to the game on a tick, passing only the most recent ones to the game and discarding the rest. On file update, the client will append all items and death links; the messages, however, will be appended and if more than the set amount are present in the file, the older messages will be pruned so that the message count is back to the set amount.
 
 The game will have no way of "scrolling up" the list of messages so any message that would not be displayed (because they were pushed up by others) are not relevant. The exact value of the limit will be determined by the in-game message viewer implementation.
 
-Messages sent by the user via the client will also be placed in the `ap.in` and sent to the game.
+Messages sent by the user via the client will also be placed in the `ap.hi` and sent to the game.
 ## Game Side Files:
-### Game information: `ap.out`
+### Game information: `ap.gi`
 A list of data sent by the game to the client.
 
 Identifiers are:
@@ -140,13 +142,12 @@ Identifiers are:
 3. `WIN`
 	Sent every tick after the win condition has been reached.
 4. `ACK <index: int>`
-	The highest index that was consumed by the game. Sent every tick, Placed at the end of the file.  The index is 0-excluded.
+	The highest index that was consumed by the game. Sent every tick.  The index is 0-excluded.
 ### Game State: `ap.gs` 
 The game's own heartbeat.
 
 This file will not be deleted upon consumption, it will be written by the game and only read by the client, not written to. 
 The client will not append the `.rd` suffix when reading this file.
-Instead of having `.up` suffixed to the file on update, the game will instead create a new `ap.gs.tmp` file and replace the previous `ap.gs`; OS failure will simply result in another attempt after some time has passed.
 
 Message Identifiers are:
 1. `HBEAT <beat: int>`
@@ -158,9 +159,10 @@ Detecting a change in here will tell the client it is still alive and attempt to
 
 This can also be used to detect a game freeze (process doesn't return, but isn't updating the heartbeat).
 ## Ownership information
-`ap.cctx` and `ap.in` files will be created by the client and deleted by the game
-`ap.out` files will be created by the game and deleted by the client
+`ap.cctx`, `ap.li` and `ap.hi` files will be created by the client and deleted by the game
+`ap.gi` files will be created by the game and deleted by the client
 `ap.cs` files will be created by the client and deleted by the client (on exit)
+`ap.gs` files will be created by the game and deleted by the game (on exit)
 
 All leftover files from previous sessions will be cleaned up by the client on launch.
 # Type treatment specification

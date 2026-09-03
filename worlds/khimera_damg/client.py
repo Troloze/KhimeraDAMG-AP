@@ -64,7 +64,7 @@ class KhimeraDAMGContext(CommonContext):
     def start_up_game_processes(self) -> None:
         host_apworld_version: str = self.slot_data["apworld_version"]
         if self.communication_handler is None:
-            self.communication_handler = KhimeraCommunicationHandler(host_apworld_version, self)
+            self.communication_handler = KhimeraCommunicationHandler(self)
         if not self.launcher.is_game_running:
             if self.launcher.stored_data_validated:
                 self.launcher.launch_game(host_apworld_version)
