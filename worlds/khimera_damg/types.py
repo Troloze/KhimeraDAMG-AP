@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Literal, NamedTuple
+from typing import Any, NamedTuple
 
 from BaseClasses import Item, ItemClassification, Location  # type: ignore
 from NetUtils import NetworkItem  # type: ignore
@@ -200,54 +200,67 @@ class LocationInformation:
 
 
 @dataclass
-class RuntimeStatus:
-    status: int
-    heartbeat: int
+class RuntimeInformation:
+    item_list: list[tuple[int, NetworkItem]] | None = None
+    locations: set[int] | None = None
+    location_acks: set[int] | None = None
+    messages: list[tuple[int, str]] | None = None
+    death_link: list[tuple[int, int, str]] | None = None
+    death_ack: int | None = None
+    ack: int | None = None
+    is_win: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "status": self.status,
-            "heartbeat": self.heartbeat
-        }
-
-
-@dataclass
-class RuntimeInformation:
-    item_list: list[tuple[int, NetworkItem]]
-    locations: set[int]
-    messages: list[str]
-    death_link: list[str]
-    ack: int
-    is_win: bool
-
-    def to_dict(self, info_type: Literal["host", "game"]) -> dict[str, Any]:
-        if info_type == "host":
-            return {
-                "item_list":    self.item_list,
-                "locations":    self.locations,
-                "messages":     self.messages,
-                "death_link":   self.death_link
-            }
-        # elif type == "game":
-        return {
-            "locations":    self.locations,
-            "death_link":   self.death_link,
-            "ack":          self.ack,
-            "is_win":       self.is_win
+            "item_list":        self.item_list,
+            "locations":        self.locations,
+            "location_acks":    self.location_acks,
+            "messages":         self.messages,
+            "death_link":       self.death_link,
+            "death_ack":        self.death_ack,
+            "ack":              self.ack,
+            "is_win":           self.is_win
         }
 
     def merge(self, merger: RuntimeInformation | None, merger_first: bool = False) -> RuntimeInformation:
         if merger is None:
             return self
-        self.locations = self.locations.union(merger.locations)  # Unions are unordered so it doesn't make a difference
-        self.ack = self.ack if self.ack >= merger.ack else merger.ack
-        self.is_win = self.is_win or merger.is_win
+        if merger.locations is not None:
+            self.locations = (self.locations or set()) | merger.locations
+        if merger.location_acks is not None:
+            self.location_acks = (self.location_acks or set()) | merger.location_acks
+        self.is_win = bool(self.is_win or merger.is_win)
         if not merger_first:
-            self.item_list = self.item_list + merger.item_list
-            self.messages = self.messages + merger.messages
-            self.death_link = self.death_link + merger.death_link
+            # if merger is not None, overwrite
+            if merger.ack is not None:
+                self.ack = merger.ack
+            # if merger is not None, overwrite
+            if (
+                merger.death_ack is not None and
+                not merger.death_ack == -1
+            ):
+                self.death_ack = merger.death_ack
+            if merger.item_list is not None:
+                self.item_list = (self.item_list or []) + merger.item_list
+            if merger.messages is not None:
+                self.messages = (self.messages or []) + merger.messages
+            if merger.death_link is not None:
+                self.death_link = (self.death_link or []) + merger.death_link
         else:
-            self.item_list = merger.item_list + self.item_list
-            self.messages = merger.messages + self.messages
-            self.death_link = merger.death_link + self.death_link
+            # if self is not None, maintain
+            if self.ack is None:
+                self.ack = merger.ack
+            # if self is not None, maintain
+            if (
+                self.death_ack is None and
+                merger.death_ack is not None and
+                not merger.death_ack == -1
+            ):
+                self.death_ack = merger.death_ack
+            if merger.item_list is not None:
+                self.item_list = merger.item_list + (self.item_list or [])
+            if merger.messages is not None:
+                self.messages = merger.messages + (self.messages or [])
+            if merger.death_link is not None:
+                self.death_link = merger.death_link + (self.death_link or [])
         return self

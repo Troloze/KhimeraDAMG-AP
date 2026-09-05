@@ -7,15 +7,18 @@ import queue
 import secrets
 import threading
 import time
+from contextlib import suppress
+from json import JSONDecodeError
 from typing import Any, ClassVar
 
 from NetUtils import NetworkItem  # type: ignore
 
-from ...misc import normalize_and_sanitize
-from ...types import ConnectionContext, LocationInformation, RuntimeInformation, RuntimeStatus
+from ...types import ConnectionContext, LocationInformation, RuntimeInformation
 from ..classes import CommunicationAgent, CommunicationContract
 
 logger = logging.getLogger("Client")
+
+unknown_path_set = set()
 
 
 class AgentV1(CommunicationAgent):
@@ -32,30 +35,49 @@ class AgentV1(CommunicationAgent):
         "ap.gi",
         "ap.gi.tmp",
         "ap.gi.rd",
-        "ap.cs",
-        "ap.cs.tmp"
     ]
 
     _shutdown_cleanup_exclude: ClassVar[list[str]] = [
         "ap.gi.tmp"  # Not included since game produced tmp files should be invisible to the client
     ]
 
+    _max_heartbeat_timeout: ClassVar[float] = 2.5
+
     async def on_game_status_update(self, timeout: float = 1.0) -> bool:
         async def _loop() -> None:
-            first_value = None
-            current_value = None
+            first = None
             while True:
                 await asyncio.sleep(0.1)
-                raw = self._read_file("ap.gs", status=True)
-                current_value = self.contract.read_content("gs", raw)["heartbeat"] if raw is not None else None
-                if current_value is None or current_value < 0:
+                path_list = self.sandbox.glob("*.gshb")
+                try:
+                    beat_file = next(path_list)
+                except StopIteration:
+                    # No .gshb files in the sandbox folder
                     continue
-                if first_value is None:
-                    first_value = current_value
-                    continue
-                if first_value != current_value:
-                    break
 
+                with suppress(StopIteration):
+                    next(path_list)
+                    # Stop iteration didn't raise, so there are multiple files.
+                    # Should be read as no-data
+                    continue
+
+                raw = self.contract.read_content("gshb", beat_file.name)
+
+                try:
+                    beat = int(raw["message"])
+                except ValueError:
+                    if beat_file not in unknown_path_set:
+                        unknown_path_set.add(beat_file)
+                        logger.warning(f"Unexpected flag name: {beat_file}")
+                    # Unknown value error
+                    return
+
+                if first is None:
+                    first = beat
+                    continue
+                if first == beat:
+                    continue
+                return
         task = asyncio.create_task(_loop())
 
         try:
@@ -64,7 +86,6 @@ class AgentV1(CommunicationAgent):
                     await task
             else:
                 await task
-
             return True
         except TimeoutError:
             # No updates in time
@@ -102,7 +123,7 @@ class AgentV1(CommunicationAgent):
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
         threading.Thread(
-            target=self._consume_incomming,
+            target=self._consume_incoming,
             name="KhimeraDAMG Communication Consumer Loop",
             daemon=True
         ).start()
@@ -131,28 +152,32 @@ class AgentV1(CommunicationAgent):
         self.communication_opened = False
         self.communication_closed = False
         self.last_connection_status = 1
+        self.last_game_heartbeat: int = -1
+        self.time_since_last_heartbeat_update: float = -1
         self._test_sandbox_access()  # Needs to be on init so game status update can be detected.
         self.thread_exit = threading.Event()
 
     def _on_start(self) -> None:
         for file in self._cleanup_target_files:
             file_path = self.sandbox / file
-            try:
+            with suppress(OSError):
                 file_path.unlink(missing_ok=True)
-            except OSError:
-                # Leftover data that couldn't be deleted, the readers and writers can handle these.
-                continue
+        paths = self.sandbox.glob("*.cs*")
+        for path in paths:
+            with suppress(OSError):
+                path.unlink(missing_ok=True)
 
     def _on_exit(self) -> None:
         for file in [entry for entry in self._cleanup_target_files if entry not in self._shutdown_cleanup_exclude]:
             file_path = self.sandbox / file
-            try:
+            with suppress(OSError):
                 file_path.unlink(missing_ok=True)
-            except OSError:
-                # Leftover data that will need to be handled on startup next session
-                continue
+        paths = self.sandbox.glob("*.cs*")
+        for path in paths:
+            with suppress(OSError):
+                path.unlink(missing_ok=True)
 
-    def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, RuntimeStatus] | None:
+    def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, tuple[int, int]] | None:
         if self.communication_closed or self.htg_q is None or self.htg_q.is_shutdown:
             return None
 
@@ -166,11 +191,11 @@ class AgentV1(CommunicationAgent):
             except queue.ShutDown:
                 return None
 
-        item_list: list[tuple[int, NetworkItem]] = []
-        messages: list[str] = []
-        locations: set[int] = set()
-        death_link: list[str] = []
-
+        item_list: list[tuple[int, NetworkItem]] | None = []
+        messages: list[tuple[int, str]] | None = []
+        location_ids: set[int] | None = set()
+        death_links: list[tuple[int, int, str]] | None = []
+        death_ack: int | None = None
         # heartbeat and ack should remember their last values instead of
         # sending empty/null/nodata values.
 
@@ -178,20 +203,31 @@ class AgentV1(CommunicationAgent):
             if entry[0] == "item":
                 item_list.append(entry[1])
             if entry[0] == "location":
-                locations.add(entry[1])
+                location_ids.add(entry[1])
             if entry[0] == "message":
                 messages.append(entry[1])
             if entry[0] == "death_link":
-                death_link.append(entry[1])
+                death_links.append(entry[1])
+            if entry[0] == "death_ack":
+                death_ack = entry[1]
             if entry[0] == "status":
                 self.last_connection_status = entry[1]
 
-        ri = RuntimeInformation(item_list, locations, messages, death_link, -1, False)
-        rs = RuntimeStatus(self.last_connection_status, heartbeat)
+        if len(item_list) == 0:
+            item_list = None
+        if len(location_ids) == 0:
+            location_ids = None
+        if len(messages) == 0:
+            messages = None
+        if len(death_links) == 0:
+            death_links = None
+
+        ri = RuntimeInformation(item_list, location_ids, None, messages, death_links, death_ack, None, False)
+        rs = (self.last_connection_status, heartbeat)
 
         return (ri, rs)
 
-    def _consume_incomming(self) -> None:
+    def _consume_incoming(self) -> None:
         tick_count = 0
         try:
             while not self.communication_closed:
@@ -200,13 +236,29 @@ class AgentV1(CommunicationAgent):
                 tick_count += 1
                 if queue_values is not None:
                     try:
-                        self._send_connection_status(queue_values[1])
+                        self._send_client_status_connection(queue_values[1][0])
                     except Exception:
                         logger.exception("Failed to update connection status.")
                     try:
-                        self._receive_game_status()
+                        self._send_client_status_heartbeat(queue_values[1][1])
                     except Exception:
-                        logger.exception("Failed to receive game status.")
+                        logger.exception("Failed to update heartbeat.")
+                    try:
+                        self._receive_game_status_heartbeat()
+                    except Exception:
+                        logger.exception("Failed to receive game heartbeat.")
+                    try:
+                        self._receive_game_status_ack()
+                    except Exception:
+                        logger.exception("Failed to receive game ack.")
+                    try:
+                        self._receive_game_status_requirements()
+                    except Exception:
+                        logger.exception("Failed to receive game requirements.")
+                    try:
+                        self._receive_game_status_win()
+                    except Exception:
+                        logger.exception("Failed to receive game win.")
                     try:
                         self._receive_game_information()
                     except Exception:
@@ -245,6 +297,9 @@ class AgentV1(CommunicationAgent):
                 continue
             break
 
+    def _is_game_alive(self) -> bool:
+        return self._max_heartbeat_timeout > time.perf_counter() - self.time_since_last_heartbeat_update
+
     def _write_file(self, name: str, data: str, status: bool = False) -> bool:
         base_path = self.sandbox / name
         tmp_path = self.sandbox / f"{name}.tmp"
@@ -259,37 +314,28 @@ class AgentV1(CommunicationAgent):
 
         return True
 
-    def _read_file(self, name: str, status: bool = False) -> str | None:
+    def _read_file(self, name: str, status: bool = False) -> list[str]:
         base_path = self.sandbox / name
         rd_path = self.sandbox / f"{name}.rd"
         old_data: str | None = None
+        ret: list[str] = []
 
         if status:
-            try:
+            with suppress(OSError):
                 raw = base_path.read_text()
-            except OSError:
-                return None
-            return normalize_and_sanitize(raw)
+                ret.append(raw)
+            return ret
 
         if rd_path.exists():
             # Attempt to recover the stray file
-            try:
+            with suppress(OSError):
                 old_data = rd_path.read_text()
-            except OSError:
-                pass
-
-            try:
+                ret.append(old_data)
+            with suppress(OSError):
                 rd_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-            if old_data is not None:
-                old_data = normalize_and_sanitize(old_data)
-                # Drops deathlinks
-                old_data = "\n".join(row for row in old_data.splitlines() if "DLINK" not in row[:5])
 
         if not base_path.exists():
-            return old_data
+            return ret
 
         try:
             base_path.rename(rd_path)
@@ -297,44 +343,33 @@ class AgentV1(CommunicationAgent):
             # Let's attempt to recover this stray file.
             if old_data is None:
                 # Otherwise we already recovered it, but unlink failed.
-                try:
+                with suppress(OSError):
                     old_data = rd_path.read_text()
+                    ret.append(old_data)
+                with suppress(OSError):
                     rd_path.unlink()
-                except OSError:
-                    return None
-
-                if old_data is not None:
-                    old_data = normalize_and_sanitize(old_data)
-                    # Drops deathlinks
-                    old_data = "\n".join(row for row in old_data.splitlines() if "DLINK" not in row[:5])
 
             try:
                 # .rd was recovered, otherwise this wouldn't be reachable;
                 # we can use replace directly here.
                 os.replace(base_path, rd_path)
             except OSError:
-                return old_data
+                return ret
         except OSError:
-            return old_data
+            return ret
 
         try:
             data = rd_path.read_text()
         except OSError:
-            # Leaves stray, hopefully catched in the next tick.
-            return old_data
-        data = normalize_and_sanitize(data)
+            # Leaves stray, hopefully caught in the next tick.
+            return ret
 
-        try:
+        ret.insert(0, data)
+
+        with suppress(OSError):
             rd_path.unlink(missing_ok=True)
-        except OSError:
-            pass
 
-        if old_data is not None:
-            # old data is sanitized for death links already, we can just add these.
-            # Client does not read messages.
-            data = f"{old_data}\n{data}"
-
-        return data
+        return ret
 
     async def _send_connection_context(self, cctx: ConnectionContext) -> None:
         message, _exit_code = self.contract.write_content("cctx", cctx.to_dict())
@@ -360,70 +395,314 @@ class AgentV1(CommunicationAgent):
         hi = hi.merge(self.host_information_buffer, merger_first=True)
         cap = self.contract.max_messages_per_tick
 
-        pruned_messages = hi.messages[-cap:]
-        self.host_information_buffer = RuntimeInformation(
-            item_list=hi.item_list,
-            locations=hi.locations,
-            messages=pruned_messages,
-            death_link=hi.death_link,
-            ack=hi.ack,         # Not used in host information, but required by the constructor
-            is_win=hi.is_win    # Not used in host information, but required by the constructor
-        )
+        if hi.messages is not None:
+            hi.messages = hi.messages[-cap:]
+        self.host_information_buffer = hi
 
         if not (
             self.host_information_buffer.item_list or
             self.host_information_buffer.locations or
             self.host_information_buffer.messages or
-            self.host_information_buffer.death_link
+            self.host_information_buffer.death_link or
+            self.host_information_buffer.death_ack
         ):
+            # Do not send an unnecessary empty message
             return
 
-        message, _exit_code = self.contract.write_content("hi", self.host_information_buffer.to_dict("host"))
+        message, _exit_code = self.contract.write_content("hi", self.host_information_buffer.to_dict())
 
         if self._write_file("ap.hi", message):
             self.host_information_buffer = None
 
-    def _send_connection_status(self, gs: RuntimeStatus) -> None:
-        message, _exit_code = self.contract.write_content("cs", gs.to_dict())
-        # Doesn't need a buffer or a loop.
-        self._write_file("ap.cs", message, status=True)
+    def _send_client_status_heartbeat(self, heartbeat: int) -> None:
+        if self.gth_q is None or self.gth_q.is_shutdown:
+            return
+
+        params = {
+            "flag": "cshb",
+            "value": heartbeat
+        }
+
+        name, _ = self.contract.write_content("cshb", params)
+        new_path = self.sandbox / name
+
+        path_list = self.sandbox.glob("*.cshb")
+        sorted_paths = list(path_list)
+
+        if len(sorted_paths) == 0:
+            # create
+            with suppress(OSError):
+                new_path.write_text("")
+        elif len(sorted_paths) == 1:
+            # rename
+            if new_path.exists():
+                return
+            file = sorted_paths[0]
+            with suppress(OSError):
+                file.rename(new_path)
+        else:
+            # delete older, rename newest
+            file = sorted_paths.pop()
+            for entry in sorted_paths:
+                with suppress(OSError):
+                    entry.unlink()
+            if file == new_path:
+                return
+            with suppress(OSError):
+                file.rename(new_path)
+
+    def _send_client_status_connection(self, connected: int) -> None:
+        if self.gth_q is None or self.gth_q.is_shutdown:
+            return
+
+        params = {
+            "flag": "csc",
+            "value": connected
+        }
+
+        name, _ = self.contract.write_content("csc", params)
+        new_path = self.sandbox / name
+
+        path_list = self.sandbox.glob("*.csc")
+        sorted_paths = list(path_list)
+
+        if len(sorted_paths) == 0:
+            # create
+            with suppress(OSError):
+                new_path.write_text("")
+        elif len(sorted_paths) == 1:
+            # rename
+            if new_path.exists():
+                return
+            file = sorted_paths[0]
+            with suppress(OSError):
+                file.rename(new_path)
+        else:
+            # delete older, rename newest
+            file = sorted_paths.pop()
+            for entry in sorted_paths:
+                with suppress(OSError):
+                    entry.unlink()
+            if file == new_path:
+                return
+            with suppress(OSError):
+                file.rename(new_path)
 
     def _receive_game_information(self) -> None:
         if self.gth_q is None or self.gth_q.is_shutdown:
             return
 
-        raw: str | None = self._read_file("ap.gi")
+        raw: list[str] = self._read_file("ap.gi")
         # Could not open file, try again next tick.
-        if raw is None:
+        if len(raw) == 0:
             return
 
-        game_information: dict[str, Any] = self.contract.read_content("gi", raw)
-        locations: set[int] = game_information["locations"]
-        death_link: list[str] = game_information["death_link"]
-        ack: int = game_information["ack"]
-        is_win: bool = game_information["is_win"]
-        _exit_code: int = game_information["exit_code"]  # Currently does nothing
+        game_information: dict[str, Any] = self.contract.read_content("gi", raw[0])
+        message: dict[str, Any] | None = game_information.get("message")
+        if message is None or not isinstance(message, dict):
+            return
 
-        for entry in locations:
-            self.gth_q.put(("location", entry))
-        for entry in death_link:
-            self.gth_q.put(("death_link", entry))
-        if ack != -1:  # Corrupted acks should be ignored.
-            self.gth_q.put(("ack", ack))
-        self.gth_q.put(("is_win", is_win))
+        locations: set[int] | None = set(l_ids) if (l_ids := message.get("location_ids")) is not None else None
+        death_data: dict[str, Any] | None = message.get("death_link")
+        death_link: tuple[int, int, str] | None = None
+        if (
+            death_data is not None and
+            isinstance(death_data, dict) and
+            isinstance(death_data.get("id"), int) and
+            isinstance(death_data.get("message"), str)
+        ):
+            death_link = (-1, death_data["id"], death_data["message"])
+        location_acks: set[int] | None = set(l_ids) if (l_ids := message.get("location_acks")) is not None else None
+        death_ack: int | None = message.get("death_ack")
+        _exit_code: int | None = game_information.get("exit_code")  # Currently does nothing
+        if len(raw) > 1:
+            # we can only ever have 2 entries here
+            class GetOutOfHereError(Exception):
+                pass
+            # This here is old information
+            with suppress(JSONDecodeError, GetOutOfHereError):
+                game_information_: dict[str, Any] = self.contract.read_content("gi", raw[1])
+                message_ = game_information_.get("message")
+                if message_ is None:
+                    raise GetOutOfHereError
+                locations_: set[int] | None = \
+                    set(l_ids) if (l_ids := message_.get("location_ids")) is not None else None
+                if locations_ is not None:
+                    locations = (locations or set()) | locations_
+                if death_link is None:  # Prioritize the newer
+                    death_data_: dict[str, Any] | None = message_.get("death_link")
+                    if (
+                        death_data_ is not None and
+                        isinstance(death_data_, dict) and
+                        isinstance(death_data_.get("id"), int) and
+                        isinstance(death_data_.get("message"), str)
+                    ):
+                        death_link = (-1, death_data_["id"], death_data_["message"])
+                location_acks_: set[int] | None = \
+                    set(l_ids) if (l_ids := message_.get("location_acks")) is not None else None
+                if location_acks_ is not None:
+                    location_acks = (location_acks or set()) | location_acks_
+                death_ack_: int | None = message_.get("death_ack")
+                if death_ack_ is not None:
+                    # Prioritize the newer
+                    death_ack = death_ack if death_ack is not None else death_ack_
+                    pass
+                __exit_code: int | None = game_information_.get("exit_code")  # Currently does nothing
 
-    def _receive_game_status(self) -> None:
+        if locations is not None:
+            for entry in locations:
+                self.gth_q.put(("location", entry))
+        if death_link is not None:
+            self.gth_q.put(("death_link", death_link))
+        if death_ack is not None:
+            self.gth_q.put(("death_ack", death_ack))
+        if location_acks is not None:
+            for entry in location_acks:
+                self.gth_q.put(("location_ack", entry))
+
+    def _receive_game_status_heartbeat(self) -> None:
         if self.gth_q is None or self.gth_q.is_shutdown:
             return
 
-        raw: str | None = self._read_file("ap.gs", status=True)
-        # Could not open file, try again next tick.
-        if raw is None:
+        path_list = self.sandbox.glob("*.gshb")
+        try:
+            latest_file = next(path_list)
+        except StopIteration:
+            # No .gshb files in the sandbox folder
             return
 
-        game_status = self.contract.read_content("gs", raw)
-        heartbeat = game_status["heartbeat"]
-        _exit_code: int = game_status["exit_code"]  # Currently does nothing
+        with suppress(StopIteration):
+            next(path_list)
+            # Stop iteration didn't raise, so there are multiple files.
+            # Should be read as no-data
+            return
 
-        if heartbeat != -1:  # Corrupted heartbeats should be ignored
-            self.gth_q.put(("heartbeat", heartbeat))
+        raw = self.contract.read_content("gshb", latest_file.name)
+
+        try:
+            beat = int(raw["message"])
+        except ValueError:
+            if latest_file not in unknown_path_set:
+                unknown_path_set.add(latest_file)
+                logger.warning(f"Unexpected flag name: {latest_file}")
+            # Unknown value error
+            return
+
+        if beat != self.last_game_heartbeat:
+            self.last_game_heartbeat = beat
+            self.time_since_last_heartbeat_update = time.perf_counter()
+        # No writes to the queue, since the client really doesn't need to know this
+
+    def _receive_game_status_requirements(self) -> None:
+        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+            return
+
+        path_list = self.sandbox.glob("*.gsreq")
+
+        try:
+            latest_file = next(path_list)
+        except StopIteration:
+            # No .gsreq files in the sandbox folder
+            return
+
+        ambiguous = True
+
+        try:
+            next(path_list)
+        except StopIteration:
+            ambiguous = False
+
+        if ambiguous:
+            # Ambiguous state, treat as no-data
+            return
+
+        raw = self.contract.read_content("gsreq", latest_file.name)
+
+        # gsreq does not require memory
+        try:
+            state = int(raw["message"])
+        except ValueError:
+            if latest_file not in unknown_path_set:
+                unknown_path_set.add(latest_file)
+                logger.warning(f"Unexpected flag name: {latest_file}")
+            # Unknown value error
+            return
+        req_cctx: bool = bool(state & 0b10)
+        req_li: bool = bool(state & 0b01)
+
+        if req_cctx:
+            self.gth_q.put(("req_cctx", True))
+        if req_li:
+            self.gth_q.put(("req_li", True))
+
+    def _receive_game_status_ack(self) -> None:
+        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+            return
+
+        path_list = self.sandbox.glob("*.gsack")
+
+        try:
+            latest_file = next(path_list)
+        except StopIteration:
+            # No .gsack files in the sandbox folder
+            return
+
+        ambiguous = True
+
+        try:
+            next(path_list)
+        except StopIteration:
+            ambiguous = False
+
+        if ambiguous:
+            # Ambiguous state, treat as no-data
+            return
+
+        raw = self.contract.read_content("gsack", latest_file.name)
+
+        try:
+            ack = int(raw["message"])
+        except ValueError:
+            if latest_file not in unknown_path_set:
+                unknown_path_set.add(latest_file)
+                logger.warning(f"Unexpected flag name: {latest_file}")
+            # Unknown value error
+            return
+
+        self.gth_q.put(("ack", ack))
+
+    def _receive_game_status_win(self) -> None:
+        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+            return
+
+        path_list = self.sandbox.glob("*.gswin")
+
+        try:
+            latest_file = next(path_list)
+        except StopIteration:
+            # No .gswin files in the sandbox folder
+            return
+
+        ambiguous = True
+
+        try:
+            next(path_list)
+        except StopIteration:
+            ambiguous = False
+
+        if ambiguous:
+            # Ambiguous state, treat as no-data
+            return
+
+        raw = self.contract.read_content("gswin", latest_file.name)
+
+        try:
+            win = int(raw["message"])
+        except ValueError:
+            if latest_file not in unknown_path_set:
+                unknown_path_set.add(latest_file)
+                logger.warning(f"Unexpected flag name: {latest_file}")
+            # Unknown value error
+            return
+
+        self.gth_q.put(("is_win", win))

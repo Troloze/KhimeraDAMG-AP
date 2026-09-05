@@ -59,15 +59,9 @@ string_normalization_table = str.maketrans({
 # Cleans up a string, transforms to ascii and replaces unknown characters with a string.
 def normalize_and_sanitize(entry: str, unknown_replacement: str = "_") -> str:
     if entry.isascii():
-        return entry
+        return re.sub(r"[\x00-\x1F\x7F]", "", entry)
 
-    entry_clean = entry.translate(string_normalization_table)
-    normalized = unicodedata.normalize("NFKD", entry_clean)
-    normalized_filtered = "".join(c for c in normalized if unicodedata.combining(c) == 0)
-    normalized_dirty = normalized_filtered.replace("?", "\\?")
-    ascii_dirty = normalized_dirty.encode("ascii", "replace").decode("ascii")
-    return re.sub(
-        r"\\\?|\?",
-        lambda m: "?" if m.group() == "\\?" else unknown_replacement,
-        ascii_dirty
-    )
+    entry = entry.translate(string_normalization_table)
+    entry = unicodedata.normalize("NFKD", entry)
+    entry = "".join(c if c.isascii() else unknown_replacement for c in entry if unicodedata.combining(c) == 0)
+    return re.sub(r"[\x00-\x1F\x7F]", "", entry)
