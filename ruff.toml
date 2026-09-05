@@ -28,9 +28,7 @@ ignore = [
     "ANN401", # Any exists for a reason and I intend to use it.
     "RUF067", # It is common practice for __init__ to contain world stuff in archipelago, I do not intend to go against it.
     "PLC2801", # Necessary to use object.__setattr__ when making dataclass sanitizer functions.
-    "PLC1901", # Author agrees with this rule
+    "PLC1901", # Author disagrees with this rule, explicit is better than implicit.
     "RUF106", # Author believes codes are more convenient than description.
-
-    # Testing
-    # "A001",
+    #"RUF052", # Author disagrees with this rule,
 ] 

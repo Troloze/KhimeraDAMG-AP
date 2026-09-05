@@ -94,13 +94,15 @@ All Python in `worlds/khimera_damg/` must follow the Archipelago style guide
   top-level definitions, no shadowing builtins (`id`, `type`, `map`), no unused imports.
 - Avoid `match` statements unless they genuinely pattern-match.
 
-Reference config: `Archipelago/ruff.toml` (line-length 120, py311). 
-You may also lint locally using:
-`ruff check --config Archipelago/ruff.toml worlds/khimera_damg/`
+Reference config is available at the repo root: `ruff.toml`; do not use the one in `Archipelago`
+You may also lint locally using: `ruff check --config ruff.toml worlds/khimera_damg/`
 
 Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]` or 
 `# ruff: enable[]` are to be viewed as a deliberate choice by the user to go against 
 the style rules and should be allowed.
+
+**The standards above only applies to code <u>within</u> the apworld**; tests outside of the apworld folder do not need to be
+held to these standards.
 
 ## Archipelago correctness rules
 

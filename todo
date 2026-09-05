@@ -2,14 +2,20 @@
 Write todo tasks down here.
 This isn't an exhaustive list
 Do not delete items until you've finished the PR
-Move the "todo after PR" items into the "todo before sending PR" section once you've finished the PR
+Move the "todo after PR" items into the "todo before sending PR" section once you've **finished merging the PR**
+Once the list is exhausted, check Future Reference.md in /docs for more things to do.
+If that's exhausted as well, it's probably time to make a release.
 
 **Todo before sending a PR**
-- Incorporate the ionium AP-index repo as a submodule
-  - This will allow the use of their automated apworld tests.
-  - Useful considering I plan on incorporating my apworld to the index
-
+- ~~Implement JSON into contract~~ (Done)
 
 **Todo right after sending the PR** 
-
-- Implement JSON into contract
+- Finish the client
+    - Link the communication interface with the client
+    - Handle client logic
+        - Save last ack on memory
+        - incomming death link id handling
+        - Obtaining and sending information from and to the host
+        - Handling messages sent by the user on the client
+            - Goes to both the server and the game
+                - Needs to verify if the server doesn't send the message back to the client, in this case we shouldn't forward client-sent messages to the game 
