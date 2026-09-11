@@ -117,13 +117,11 @@ This message will be a json with:
 	- `"messages"` a list with the messages (str)
 	- `"count"` number of entries
 	- The two lists must have the same length.
-- `"death_links"` a dict with:
-	- `"senders"` a list with the death link sender player id (int)
-	- `"death_ids"` a list with the death link ids (int)
+- `"death_link"` a dict with:
+	- `"sender"` the death link sender player id (str)
+	- `"death_id"` the death link ids (int)
 		- these are managed by the client, not the host.
-	- `"messages"` a list with the death link messages (str)
-	- `"count"` number of entries
-	- The two lists must have the same length.
+	- `"message"` the death link messages (str)
 - `"item_list"` with a dict value:
 	- `"item_ids"` with a list of all item ids (int)
 	- `"player_ids"` with a list of all the player ids (int) that sent the items

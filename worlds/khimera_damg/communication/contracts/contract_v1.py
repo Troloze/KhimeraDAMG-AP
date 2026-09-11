@@ -287,15 +287,29 @@ class ContractV1(CommunicationContract):
         if loc_info is not None:
             for location, (classification, player) in loc_info.items():
                 try:
-                    validate_int_non_negative(location)
-                    validate_int_non_negative(classification)
-                    validate_int_non_negative(player)
+                    validate_int_non_negative(int(location))
+                    validate_int_non_negative(int(classification))
+                    validate_int_non_negative(int(player))
                 except ValueError as err:
-                    raise ValueError("Location id, classification and player id all have to be non negative values.") \
-                        from err
-                location_ids_.append(location)
-                location_classifications_.append(classification)
-                player_ids_.append(player)
+                    raise ValueError(
+                        f"Location id ({location}),"
+                        f"classification ({classification}) and"
+                        f"player id ({player})"
+
+                        "all have to be non negative values."
+                    ) from err
+                except TypeError as err:
+                    raise ValueError(
+                        f"Location id ({location}),"
+                        f"classification ({classification}) and"
+                        f"player id ({player})"
+
+                        "all have to be non negative values."
+                    ) from err
+
+                location_ids_.append(int(location))
+                location_classifications_.append(int(classification))
+                player_ids_.append(int(player))
                 count_ += 1
 
         message: dict[str, Any] = {
@@ -314,7 +328,7 @@ class ContractV1(CommunicationContract):
     def _write_host_info(cls, params: dict[str, Any]) -> tuple[str, int]:
         messages: list[tuple[int, str]] | None = params["messages"]
         item_list: list[tuple[int, NetworkItem]] | None = params["item_list"]
-        death_link: list[tuple[int, int, str]] | None = params["death_link"]
+        death_link: tuple[str, int, str] | None = params["death_link"]
         location_ids: set[int] | None = params["locations"]
         death_ack: int | None = params["death_ack"]
 
@@ -336,22 +350,12 @@ class ContractV1(CommunicationContract):
             message["messages"] = messages_
 
         if death_link is not None:
-            dlsenders_ = []
-            dlids_ = []
-            dlmessages_ = []
-            dlcount_ = 0
-            for (dlsender, dlid, dlmsg) in death_link:
-                dlsenders_.append(dlsender)
-                dlids_.append(dlid)
-                dlmessages_.append(normalize_and_sanitize(dlmsg))
-                dlcount_ += 1
             death_links_: dict[str, Any] = {
-                "senders": dlsenders_,
-                "death_ids": dlids_,
-                "messages": dlmessages_,
-                "count": dlcount_
+                "sender": normalize_and_sanitize(death_link[0]),
+                "death_id": death_link[1],
+                "message": normalize_and_sanitize(death_link[2]),
             }
-            message["death_links"] = death_links_
+            message["death_link"] = death_links_
 
         if item_list is not None:
             item_ids_ = []

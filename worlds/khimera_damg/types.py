@@ -165,6 +165,7 @@ class ConnectionContext:
     host_world_version: str
     client_world_version: str
     slot_name: str
+    seed: str
     last_ack: int
     options: dict[str, Any]
     slot_data: dict[str, Any]
@@ -205,7 +206,7 @@ class RuntimeInformation:
     locations: set[int] | None = None
     location_acks: set[int] | None = None
     messages: list[tuple[int, str]] | None = None
-    death_link: list[tuple[int, int, str]] | None = None
+    death_link: tuple[str, int, str] | None = None
     death_ack: int | None = None
     ack: int | None = None
     is_win: bool | None = None
@@ -222,7 +223,7 @@ class RuntimeInformation:
             "is_win":           self.is_win
         }
 
-    def merge(self, merger: RuntimeInformation | None, merger_first: bool = False) -> RuntimeInformation:
+    def merge(self, merger: RuntimeInformation | None, merger_old: bool = False) -> RuntimeInformation:
         if merger is None:
             return self
         if merger.locations is not None:
@@ -230,23 +231,7 @@ class RuntimeInformation:
         if merger.location_acks is not None:
             self.location_acks = (self.location_acks or set()) | merger.location_acks
         self.is_win = bool(self.is_win or merger.is_win)
-        if not merger_first:
-            # if merger is not None, overwrite
-            if merger.ack is not None:
-                self.ack = merger.ack
-            # if merger is not None, overwrite
-            if (
-                merger.death_ack is not None and
-                not merger.death_ack == -1
-            ):
-                self.death_ack = merger.death_ack
-            if merger.item_list is not None:
-                self.item_list = (self.item_list or []) + merger.item_list
-            if merger.messages is not None:
-                self.messages = (self.messages or []) + merger.messages
-            if merger.death_link is not None:
-                self.death_link = (self.death_link or []) + merger.death_link
-        else:
+        if merger_old:  # merger has older information
             # if self is not None, maintain
             if self.ack is None:
                 self.ack = merger.ack
@@ -257,10 +242,43 @@ class RuntimeInformation:
                 not merger.death_ack == -1
             ):
                 self.death_ack = merger.death_ack
+            # if self is not None, maintain
+            if (
+                self.death_link is None and
+                merger.death_link is not None
+            ):
+                self.death_link = merger.death_link
             if merger.item_list is not None:
-                self.item_list = merger.item_list + (self.item_list or [])
+                self.item_list = (
+                    merger.item_list +
+                    [entry for entry in (self.item_list or []) if entry not in merger.item_list]
+                )
             if merger.messages is not None:
-                self.messages = merger.messages + (self.messages or [])
+                self.messages = (
+                    merger.messages +
+                    [entry for entry in (self.messages or []) if entry not in merger.messages]
+                )
+        else:  # merger has newer information
+            # if merger is not None, overwrite
+            if merger.ack is not None:
+                self.ack = merger.ack
+            # if merger is not None, overwrite
+            if (
+                merger.death_ack is not None and
+                not merger.death_ack == -1
+            ):
+                self.death_ack = merger.death_ack
+            # if merger is not None, overwrite
             if merger.death_link is not None:
-                self.death_link = merger.death_link + (self.death_link or [])
+                self.death_link = merger.death_link
+            if merger.item_list is not None:
+                self.item_list = (
+                    [entry for entry in (self.item_list or []) if entry not in merger.item_list] +
+                    merger.item_list
+                )
+            if merger.messages is not None:
+                self.messages = (
+                    [entry for entry in (self.messages or []) if entry not in merger.messages] +
+                    merger.messages
+                )
         return self

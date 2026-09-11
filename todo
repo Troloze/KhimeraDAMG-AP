@@ -7,15 +7,14 @@ Once the list is exhausted, check Future Reference.md in /docs for more things t
 If that's exhausted as well, it's probably time to make a release.
 
 **Todo before sending a PR**
-- ~~Implement JSON into contract~~ (Done)
+- ~~Finish the client~~ 
+    - ~~Link the communication interface with the client~~
+    - ~~Handle client logic~~
+        - ~~Save last ack on memory~~
+        - ~~incomming death link id handling~~
+        - ~~Obtaining and sending information from and to the host~~
+        - ~~Handling messages sent by the user on the client~~
+
+- ~~Modify the communication interface so it receives slotdata (slot_name, address)~~ 
 
 **Todo right after sending the PR** 
-- Finish the client
-    - Link the communication interface with the client
-    - Handle client logic
-        - Save last ack on memory
-        - incomming death link id handling
-        - Obtaining and sending information from and to the host
-        - Handling messages sent by the user on the client
-            - Goes to both the server and the game
-                - Needs to verify if the server doesn't send the message back to the client, in this case we shouldn't forward client-sent messages to the game 

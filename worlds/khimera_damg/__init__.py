@@ -89,7 +89,19 @@ class KhimeraDAMGWorld(World):
 
         return super().set_rules()
 
+    def get_location_information(self) -> dict[int, tuple[int, int]]:
+        ret = {}
+        locations = self.multiworld.get_locations(self.player)
+        for loc in locations:
+            if loc.address is None or loc.item is None:
+                continue
+            ret[loc.address] = (loc.item.classification, loc.item.player)
+        return ret
+
     def fill_slot_data(self) -> Mapping[str, Any]:
+        li = {}
+        if not self.multiworld.is_race:
+            li = self.get_location_information()
         return {
             "apworld_version": APWORLD_VERSION,
             "options": self.options.as_dict(
@@ -99,7 +111,10 @@ class KhimeraDAMGWorld(World):
                 "shuffle_fairies",
                 "shuffle_detonators",
                 "shuffle_gourmet_gal"
-            )
+            ),
+            "data": {},
+            "is_race": self.multiworld.is_race,
+            "location_information": li
         }
 
     def get_filler_item_name(self) -> str:
