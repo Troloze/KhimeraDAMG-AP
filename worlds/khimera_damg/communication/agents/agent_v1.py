@@ -44,6 +44,10 @@ class AgentV1(CommunicationAgent):
     _max_heartbeat_timeout: ClassVar[float] = 2.5
 
     async def on_game_status_update(self, timeout: float = 1.0) -> bool:
+        # Much, much, much faster option for when the agent is running
+        if self.communication_opened and not self.communication_closed:
+            return self._is_game_alive()
+
         async def _loop() -> None:
             first = None
             while True:
@@ -100,25 +104,19 @@ class AgentV1(CommunicationAgent):
     ) -> None:
         self.htg_q = htg_q  # Host-to-Game Queue (send)
         self.gth_q = gth_q  # Game-to-Host Queue (get)
+        self.connection_context = connection_context
+        self.location_information = location_information
         if htg_q.is_shutdown or gth_q.is_shutdown:
             raise ValueError("One of the provided queues has been shutdown.")
 
         # Cleanup
         self._on_start()
 
-        try:
-            await self._send_connection_context(connection_context)
-            await self._send_location_information(location_information)
-        except OSError as err:
-            # Do not start threads, handle this later.
-            cctx_path = self.sandbox / "ap.cctx"
-            li_path = self.sandbox / "ap.li"
-            try:
-                cctx_path.unlink(missing_ok=True)
-                li_path.unlink(missing_ok=True)
-            except OSError as err2:
-                raise err2 from err
-            raise err
+        # No need to error handle these, the .gsreq flag works to cover 
+        # for errors here.
+        self._send_connection_context()
+        self._send_location_information()
+        
 
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
@@ -177,7 +175,7 @@ class AgentV1(CommunicationAgent):
             with suppress(OSError):
                 path.unlink(missing_ok=True)
 
-    def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, tuple[int, int]] | None:
+    def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, tuple[int, int], tuple[bool, bool]] | None:
         if self.communication_closed or self.htg_q is None or self.htg_q.is_shutdown:
             return None
 
@@ -191,27 +189,35 @@ class AgentV1(CommunicationAgent):
             except queue.ShutDown:
                 return None
 
-        item_list: list[tuple[int, NetworkItem]] | None = []
+        item_map: dict[int, NetworkItem] | None = {}
         messages: list[tuple[int, str]] | None = []
         location_ids: set[int] | None = set()
-        death_links: list[tuple[int, int, str]] | None = []
+        death_link: tuple[str, int, str] | None = None
         death_ack: int | None = None
+        req_cctx = False
+        req_li = False
         # heartbeat and ack should remember their last values instead of
         # sending empty/null/nodata values.
 
         for entry in outgoing_data:
             if entry[0] == "item":
-                item_list.append(entry[1])
+                item_map[entry[1][0]] = entry[1][1]
             if entry[0] == "location":
                 location_ids.add(entry[1])
             if entry[0] == "message":
                 messages.append(entry[1])
             if entry[0] == "death_link":
-                death_links.append(entry[1])
+                death_link = entry[1]
             if entry[0] == "death_ack":
                 death_ack = entry[1]
             if entry[0] == "status":
                 self.last_connection_status = entry[1]
+            if entry[0] == "req_cctx":
+                req_cctx = entry[1]
+            if entry[0] == "req_li":
+                req_li = entry[1]
+
+        item_list: list[tuple[int, NetworkItem]] | None = sorted(item_map.items())
 
         if len(item_list) == 0:
             item_list = None
@@ -219,13 +225,12 @@ class AgentV1(CommunicationAgent):
             location_ids = None
         if len(messages) == 0:
             messages = None
-        if len(death_links) == 0:
-            death_links = None
 
-        ri = RuntimeInformation(item_list, location_ids, None, messages, death_links, death_ack, None, False)
+        ri = RuntimeInformation(item_list, location_ids, None, messages, death_link, death_ack, None, False)
         rs = (self.last_connection_status, heartbeat)
+        req = (req_cctx, req_li)
 
-        return (ri, rs)
+        return (ri, rs, req)
 
     def _consume_incoming(self) -> None:
         tick_count = 0
@@ -235,6 +240,18 @@ class AgentV1(CommunicationAgent):
                 queue_values = self._consumer(tick_count)
                 tick_count += 1
                 if queue_values is not None:
+                    if queue_values[2][0]:
+                        try:
+                            self._send_connection_context()
+                            # logger.info("cctx sent")
+                        except Exception:
+                            logger.exception("Failed to re-send connection context")
+                    if queue_values[2][1]:
+                        try:
+                            self._send_location_information()
+                            logger.info("li sent")
+                        except Exception:
+                            logger.exception("Failed to re-send location information")
                     try:
                         self._send_client_status_connection(queue_values[1][0])
                     except Exception:
@@ -371,28 +388,20 @@ class AgentV1(CommunicationAgent):
 
         return ret
 
-    async def _send_connection_context(self, cctx: ConnectionContext) -> None:
+    def _send_connection_context(self) -> None:
+        cctx = self.connection_context
         message, _exit_code = self.contract.write_content("cctx", cctx.to_dict())
-        # Doesn't need buffer, just resend the same data in case of error.
-        attempts = 0
-        while not self._write_file("ap.cctx", message):
-            attempts += 1
-            await asyncio.sleep(1.0)
-            if attempts >= 5:  # hardcoded for now, might include in the contract later
-                raise OSError("Could not write connection context.")
 
-    async def _send_location_information(self, li: LocationInformation) -> None:
+        self._write_file("ap.cctx", message)
+
+    def _send_location_information(self) -> None:
+        li = self.location_information
         message, _exit_code = self.contract.write_content("li", li.to_dict())
-        # Doesn't need buffer, just resend the same data.
-        attempts = 0
-        while not self._write_file("ap.li", message):
-            attempts += 1
-            await asyncio.sleep(1.0)
-            if attempts >= 5:
-                raise OSError("Could not write location information.")
+
+        self._write_file("ap.li", message)
 
     def _send_host_information(self, hi: RuntimeInformation) -> None:
-        hi = hi.merge(self.host_information_buffer, merger_first=True)
+        hi = hi.merge(self.host_information_buffer, merger_old=True)
         cap = self.contract.max_messages_per_tick
 
         if hi.messages is not None:
@@ -504,14 +513,18 @@ class AgentV1(CommunicationAgent):
 
         locations: set[int] | None = set(l_ids) if (l_ids := message.get("location_ids")) is not None else None
         death_data: dict[str, Any] | None = message.get("death_link")
-        death_link: tuple[int, int, str] | None = None
+        death_link: tuple[str, int, str] | None = None
         if (
             death_data is not None and
             isinstance(death_data, dict) and
             isinstance(death_data.get("id"), int) and
             isinstance(death_data.get("message"), str)
         ):
-            death_link = (-1, death_data["id"], death_data["message"])
+            # We receive a structure, not the built message,
+            # so we have to insert the slot name here.
+            dl_msg: str = death_data.get("message", "").replace("%s", self.connection_context.slot_name)
+
+            death_link = (self.connection_context.slot_name, death_data["id"], dl_msg)
         location_acks: set[int] | None = set(l_ids) if (l_ids := message.get("location_acks")) is not None else None
         death_ack: int | None = message.get("death_ack")
         _exit_code: int | None = game_information.get("exit_code")  # Currently does nothing
@@ -537,7 +550,8 @@ class AgentV1(CommunicationAgent):
                         isinstance(death_data_.get("id"), int) and
                         isinstance(death_data_.get("message"), str)
                     ):
-                        death_link = (-1, death_data_["id"], death_data_["message"])
+                        dl_msg_: str = death_data_.get("message", "").replace("%s", self.connection_context.slot_name)
+                        death_link = (self.connection_context.slot_name, death_data_["id"], dl_msg_)
                 location_acks_: set[int] | None = \
                     set(l_ids) if (l_ids := message_.get("location_acks")) is not None else None
                 if location_acks_ is not None:

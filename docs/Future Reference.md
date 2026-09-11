@@ -13,6 +13,10 @@ These will be implemented eventually.
   - If I am going to do that, I'd rather make every single screen a region.
   - For that I will need to make a structured view of all stages in the game, big and time consuming task. 
 
+# Client
+- Command for launching the game.
+- Command for restarting internal communication systems.
+
 # Launcher
 - Launcher will store the pid, auth information (name, password, room url, port), and host apworld version of the latest successful game launch + connection
   - This will be used for reconnection when the client is closed but the game stays open.

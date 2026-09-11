@@ -24,29 +24,37 @@ class KhimeraDAMGCommunicationInterface:
     def __init__(self) -> None:
         self._send_queue = queue.Queue()
         self._get_queue = queue.Queue()
+        self.host_world_version: str = ""
+        self.slot_name: str | None = None
+        self.seed: str | None = None
+        self.session_last_ack: int = 0
         self.running = False
         self.agent: CommunicationAgent | None = None
-        self.session_last_ack = -1
+
+    def send_items(self, items: list[tuple[int, NetworkItem]]) -> None:
+        for entry in items:
+            self.send_item(entry[1], entry[0])
 
     def send_item(self, item: NetworkItem, order: int) -> None:
         pckg: tuple[str, Any] = ("item", (order, item))
-
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
+    def send_locations(self, locations: set[int]) -> None:
+        for entry in locations:
+            self.send_location(entry)
+
     def send_location(self, location_id: int) -> None:
         pckg: tuple[str, Any] = ("location", location_id)
-
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
     def send_message(self, sender: int, message: str) -> None:
         pckg: tuple[str, Any] = ("message", (sender, message))
-
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
-    def send_death_link(self, sender: int, death_id: int, message: str) -> None:
+    def send_death_link(self, sender: str, death_id: int, message: str) -> None:
         pckg: tuple[str, Any] = ("death_link", (sender, death_id, message))
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
@@ -57,7 +65,17 @@ class KhimeraDAMGCommunicationInterface:
             self._send_queue.put(pckg)
 
     def send_connection_status(self, is_connected: bool) -> None:
-        pckg: tuple[str, Any] = ("status", 0 if is_connected else 1)
+        pckg: tuple[str, Any] = ("status", int(is_connected))
+        with suppress(queue.ShutDown):
+            self._send_queue.put(pckg)
+
+    def _resend_connection_context(self) -> None:
+        pckg: tuple[str, Any] = ("req_cctx", True)
+        with suppress(queue.ShutDown):
+            self._send_queue.put(pckg)
+
+    def _resend_location_information(self) -> None:
+        pckg: tuple[str, Any] = ("req_li", True)
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
@@ -66,7 +84,11 @@ class KhimeraDAMGCommunicationInterface:
         connection_context: ConnectionContext,
         location_information: LocationInformation
     ) -> None:
-        self.host_world_version: str = connection_context.host_world_version
+        if self.running:
+            return
+        self.host_world_version = connection_context.host_world_version
+        self.slot_name = connection_context.slot_name
+        self.seed = connection_context.seed
         self.agent = get_agent(self.host_world_version)()
         self.running = True
         self.starter_task = asyncio.create_task(
@@ -89,11 +111,19 @@ class KhimeraDAMGCommunicationInterface:
                 self._send_queue.shutdown()
                 self._get_queue.shutdown()
 
+    def authenticate(self, slot_name: str, seed: str) -> bool:
+        """Returns false when the credentials do not match."""
+        if self.slot_name is None or self.seed is None:
+            return False
+        if self.slot_name == slot_name and self.seed == seed:
+            return True
+        return False
+
     async def stop(self) -> None:
         if not self.running:
             return
-        self._send_queue.shutdown()
         self.running = False
+        self._send_queue.shutdown()
         # Should stop itself after turning running to false.
         # May keep feeding get_queue after a while if this happens while
         # it reads game information.
@@ -102,7 +132,7 @@ class KhimeraDAMGCommunicationInterface:
             await self.agent.wait_exit()
         self.agent = None
 
-    def consume_outgoing(self) -> tuple[RuntimeInformation, tuple[bool, bool]] | None:
+    def consume_outgoing(self) -> RuntimeInformation | None:
         incoming_data: list[tuple[str, Any]] = []
 
         while True:
@@ -113,17 +143,17 @@ class KhimeraDAMGCommunicationInterface:
             except queue.ShutDown:
                 return None
 
-        locations: set[int] | None = set()
-        location_acks: set[int] | None = set()
-        death_link: tuple[int, int, str] | None = None
+        locations: set[int] | None = None
+        location_acks: set[int] | None = None
+        death_link: tuple[str, int, str] | None = None
         death_ack: int | None = None
-        is_win: bool = False
-        req_cctx: bool = False
-        req_li: bool = False
+        is_win: bool | None = False
         for entry in incoming_data:
             if entry[1] is None:
                 continue
             if entry[0] == "location":
+                if locations is None:
+                    locations = set()
                 locations.add(entry[1])
             if entry[0] == "death_link":
                 death_link = entry[1]
@@ -132,29 +162,28 @@ class KhimeraDAMGCommunicationInterface:
                 if self.session_last_ack < nack:
                     self.session_last_ack = nack
             if entry[0] == "location_ack":
+                if location_acks is None:
+                    location_acks = set()
                 location_acks.add(entry[1])
             if entry[0] == "death_ack":
                 death_ack = entry[1]
             if entry[0] == "is_win":
                 is_win = is_win or entry[1]
             if entry[0] == "req_cctx":
-                req_cctx = entry[1]
+                self._resend_connection_context()
             if entry[0] == "req_li":
-                req_li = entry[1]
+                self._resend_location_information()
 
-        death_link_ = [death_link] if death_link is not None else None
-        ri = RuntimeInformation(
+        return RuntimeInformation(
             locations=locations,
             location_acks=location_acks,
-            death_link=death_link_,
+            death_link=death_link,
             death_ack=death_ack,
             ack=self.session_last_ack,
             is_win=is_win
         )
 
-        return ri, (req_cctx, req_li)
-
     async def probe_game_status(self, host_world_version: str, timeout: float = 1.0) -> bool:
-        agent = get_agent(host_world_version)()  # Initialized, not started.
+        agent = self.agent if self.agent is not None else get_agent(host_world_version)()
         # Could raise
         return await agent.on_game_status_update(timeout=timeout)
