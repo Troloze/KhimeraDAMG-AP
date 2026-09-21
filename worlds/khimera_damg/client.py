@@ -567,7 +567,7 @@ class KhimeraDAMGContext(CommonContext):
             seed=self.host_seed,  # type: ignore
             last_ack=last_ack,
             options=self.slot_data["options"],
-            slot_data=self.slot_data["data"],
+            generation_information=self.slot_data["generation_information"],
             game_data=game_data,
             locations=self.checked_locations,
             item_list=item_list,

@@ -61,36 +61,35 @@ This will list connection information. Will be sent when the client first launch
 
 This message will be a json with:
 - `"meta"`: (dict)
-	- holds `"archipelago_version"`, `"host_world_version"`, `"client_world_version"`, `"slot_name"`, and `"seed"` fields, each with a string value.
-- `"options"`: (dict)
-	- `"names"` Option names (list)
-	- `"types"` Option types (list)
-	- `"values"` Option values (list)
-	- `"count"` Number of entries
-	- The lists will be built so that name, type and value can be obtained from the index.
-	- Option names not contained here should be assumed as "not included" and a default value should be used.
-	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
-	- All three lists must have the same length.
-- `"slot_data"`: (dict)
-	- `"names"` Data names (list)
-	- `"types"` Data types (list)
-	- `"values"` Data values (list)
-	- `"count"` Number of entries 
-	- The lists will be built so that name, type and value can be obtained from the index.
-	- Data names not contained here should be assumed as "not included" and a default value should be used.
-	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
-	- All three lists must have the same length.
-- `"game_data"`: (dict)
-	- `"names"` Data names (list)
-	- `"types"` Data types (list)
-	- `"values"` Data values (list)
-	- `"count"` Number of entries 
-	- The lists will be built so that name, type and value can be obtained from the index.
-	- Data names not contained here should be assumed as "not included" and a default value should be used.
-	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
-	- All three lists must have the same length.
+	- Contains information that will not change throughout the archipelago session.
+	- Holds the following fields:
+		- `"archipelago_version"`: the version of the archipelago software that is being used by the client. (string)
+		- `"host_world_version"`: the version of the world that was used in generation. (string)
+		- `"client_world_version"`: the version of the world currently being used. (string)
+		- `"slot_name"`: the name of the slot. (string)
+		- `"seed"`: the generation seed. (string)
+		- `"options"`: (dict)
+			- `"names"`: Option names (list)
+			- `"types"`: Option types (list)
+			- `"values"`: Option values (list)
+			- `"count"`: Number of entries
+			- The lists will be built so that name, type and value can be obtained from the index.
+			- Option names not contained here should be assumed as "not included" and a default value should be used.
+			- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
+			- All three lists must have the same length.
+		- `"generation_information"`: (dict)
+			- `"names"`: Data names (list)
+			- `"types"`: Data types (list)
+			- `"values"`: Data values (list)
+			- `"count"`: Number of entries 
+			- The lists will be built so that name, type and value can be obtained from the index.
+			- Data names not contained here should be assumed as "not included" and a default value should be used.
+			- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
+			- All three lists must have the same length.
+
 - `"session"`: (dict)
-	- holds the following fields:
+	- Contains information that might change throughout the archipelago session. 
+	- Holds the following fields:
 		- `"last_ack"` with an int value, this is the last ack the game has sent to the client.
 		- `"item_list"` with a dict value:
 			- `"item_ids"` with a list of all item ids (int)
@@ -101,6 +100,15 @@ This message will be a json with:
 				- `item_ids[0]` will always have -1, and the same goes for player.
 			- The two lists must have the same length.
 		- `"location_ids"` with a list of all location ids that were checked (int)
+		- `"game_data"`: (dict)
+			- `"names"` Data names (list)
+			- `"types"` Data types (list)
+			- `"values"` Data values (list)
+			- `"count"` Number of entries 
+			- The lists will be built so that name, type and value can be obtained from the index.
+			- Data names not contained here should be assumed as "not included" and a default value should be used.
+			- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
+			- All three lists must have the same length.
 		- `"is_win"` (optional) holding a 1 (int). Tells the game it has been goaled.
 ### Location Information: `ap.li`
 Information regarding each individual location, including item owner and item classification.
