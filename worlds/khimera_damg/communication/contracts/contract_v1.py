@@ -55,9 +55,12 @@ def validate_version(version: str) -> None:
             raise error
 
 
+def normalize_number(value: int | float) -> int | float:
+    return int(value) if (isinstance(value, float) and value.is_integer()) else value
+
+
 class OptionDataHandler:
-    # Includes both Option and Data entries
-    type_map: ClassVar[dict[str, str]] = {
+    option_type_map: ClassVar[dict[str, str]] = {
         "death_link":               "NV",
         "victory_condition":        "NV",
         "shuffle_books":            "NV",
@@ -67,13 +70,13 @@ class OptionDataHandler:
     }
 
     @classmethod
-    def format_option_data(cls, options: dict[str, Any]) -> dict[str, Any]:
+    def format_option(cls, options: dict[str, Any]) -> dict[str, Any]:
         names = []
         types = []
         values = []
         count: int = 0
         for entry, value in options.items():
-            e_type = cls.type_map.get(entry)
+            e_type = cls.option_type_map.get(entry)
             # This shouldn't ever be necessary.
             clean_entry = normalize_and_sanitize(entry)
             if e_type == "NV":
@@ -107,25 +110,6 @@ class OptionDataHandler:
                         new_d[e_] = v
                     elif isinstance(v, str):
                         new_d[e_] = normalize_and_sanitize(v)
-                    elif isinstance(v, list):
-                        validate_list(v)
-                        if len(v) == 0:
-                            new_d[e_] = v
-                        elif isinstance(v[0], int):
-                            new_d[e_] = v
-                        elif isinstance(v[0], str):
-                            new_d[e_] = [
-                                normalize_and_sanitize(v_) for v_ in v
-                            ]
-                        else:
-                            s = (entry, e, type(v[0]).__name__)
-                            if s not in unknown_entry_type_set:
-                                unknown_entry_type_set.add(s)
-                                logger.warning(
-                                    "Unknown dict list type was ignored: "
-                                    f"dict: {entry}, entry: {e}, type: list[{type(v[0])}]"
-                                )
-                            continue
                     else:
                         s = (entry, e, type(v).__name__)
                         if s not in unknown_entry_type_set:
@@ -150,6 +134,134 @@ class OptionDataHandler:
             "values": values,
             "count": count
         }
+
+    @classmethod
+    def format_data(cls, data: dict[str, Any]) -> dict[str, Any]:
+        names = []
+        types = []
+        values = []
+        count: int = 0
+        for entry, value in data.items():
+            e_type = type(value).__name__
+            if e_type == "str":
+                e_type = "SV"
+            elif e_type == "int" or e_type == "float":
+                e_type = "NV"
+            elif e_type == "list":
+                if len(value) > 0:
+                    e_type = type(value[0]).__name__
+                    if e_type == "str":
+                        e_type = "SL"
+                    elif e_type == "int" or e_type == "float":
+                        e_type = "NL"
+                    else:
+                        e_type = f"UNKNOWN ({e_type})"
+                else:
+                    e_type = "NL"
+            elif e_type == "dict":
+                e_type = "D"
+            else:
+                e_type = f"UNKNOWN ({e_type})"
+            # This shouldn't ever be necessary.
+            clean_entry = normalize_and_sanitize(entry)
+            if e_type == "NV":
+                names.append(clean_entry)
+                types.append(e_type)
+                clean_value = normalize_number(value)
+                values.append(clean_value)
+            elif e_type == "SV":
+                names.append(clean_entry)
+                types.append(e_type)
+                clean_value = normalize_and_sanitize(value)
+                values.append(clean_value)
+            elif e_type == "NL":
+                # validate_list(value)  # Data is controled by the game, we can skip validation
+                names.append(clean_entry)
+                types.append(e_type)
+                values.append(
+                    [normalize_number(v) for v in value]
+                )
+            elif e_type == "SL":
+                # validate_list(value)  # Data is controled by the game, we can skip validation
+                names.append(clean_entry)
+                types.append(e_type)
+                values.append([
+                    normalize_and_sanitize(v) for v in value
+                ])
+            elif e_type == "D":
+                names.append(clean_entry)
+                types.append(e_type)
+                new_d = {}
+                for e, v in value.items():
+                    e_ = normalize_and_sanitize(e)
+                    if isinstance(v, int):
+                        new_d[e_] = normalize_number(v)
+                    elif isinstance(v, str):
+                        new_d[e_] = normalize_and_sanitize(v)
+                    else:
+                        s = (entry, e, type(v).__name__)
+                        if s not in unknown_entry_type_set:
+                            unknown_entry_type_set.add(s)
+                            logger.warning(
+                                "Unknown dict value type was ignored: "
+                                f"dict: {entry}, entry: {e}, type: {type(v)}"
+                            )
+                        continue
+                values.append(new_d)
+            else:
+                s = (entry,)
+                if s not in unknown_entry_type_set:
+                    unknown_entry_type_set.add(s)
+                    logger.warning(f"Unknown entry was ignored. ({entry}: {e_type} = {value})")
+                continue
+            count += 1
+
+        return {
+            "names": names,
+            "types": types,
+            "values": values,
+            "count": count
+        }
+
+    @classmethod
+    def read_data(cls, data: dict[str, Any]) -> list[tuple[int, str, Any]]:
+        data_list: list[tuple[int, str, Any]] = []
+        names: list[str] = data["names"]
+        types: list[str] = data["types"]
+        ids: list[float] = data["ids"]
+        values: list[Any] = data["values"]
+        count: int = int(data["count"])
+        if not (len(names) == len(types) and len(types) == len(ids) and len(ids) == len(values)):
+            logger.warning("Malformed data received from game")
+            return []
+        for i in range(count):
+            c_name, c_type, c_id, c_value = names[i], types[i], int(ids[i]), values[i]
+            if c_type == "SV":
+                if not isinstance(c_value, str):
+                    logger.warning(f"Game passed a string type with a non-string object ({c_name})")
+                    # Let's warn and store it anyway for now.
+                    # continue
+            elif c_type == "NV":
+                if not isinstance(c_value, (int, float)):
+                    logger.warning(f"Game passed a number type with a non-number object ({c_name})")
+                    # Let's warn and store it anyway for now.
+                    # continue
+            elif c_type == "SL" or c_type == "NL":
+                if not isinstance(c_value, list):
+                    logger.warning(f"Game passed a list type with a non-list object ({c_name})")
+                    # Let's warn and store it anyway for now.
+                    # continue
+            elif c_type == "D":
+                if not isinstance(c_value, dict):
+                    logger.warning(f"Game passed a dict type with a non-dict object ({c_name})")
+                    # Let's warn and store it anyway for now.
+                    # continue
+            elif c_type == "RM":
+                c_value = None
+            else:
+                logger.warning(f"Game has attempted to store an unknown type ({c_name}, {c_type})")
+            data_list.append((c_id, c_name, c_value))
+        return data_list
 
 
 class ContractV1(CommunicationContract):
@@ -203,9 +315,11 @@ class ContractV1(CommunicationContract):
         host_world_version: str = params["host_world_version"]
         client_world_version: str = params["client_world_version"]
         slot_name: str = params["slot_name"]
+        seed: str = params["seed"]
         last_ack: int = params["last_ack"]
         options: dict[str, Any] = params["options"]
         slot_data: dict[str, Any] = params["slot_data"]
+        game_data: dict[str, Any] = params["game_data"]
         locations: set[int] = params["locations"]
         item_list: list[tuple[int, NetworkItem]] = params["item_list"]
         has_goaled: bool = params["has_goaled"]
@@ -221,9 +335,11 @@ class ContractV1(CommunicationContract):
         host_world_version = normalize_and_sanitize(host_world_version)
         client_world_version = normalize_and_sanitize(client_world_version)
         slot_name = normalize_and_sanitize(slot_name)
+        seed = normalize_and_sanitize(seed)
 
-        options_ = OptionDataHandler.format_option_data(options)
-        slot_data_ = OptionDataHandler.format_option_data(slot_data)
+        options_ = OptionDataHandler.format_option(options)
+        slot_data_ = OptionDataHandler.format_data(slot_data)
+        game_data_ = OptionDataHandler.format_data(game_data)
 
         item_ids_ = [-1]
         player_ids_ = [-1]
@@ -242,7 +358,8 @@ class ContractV1(CommunicationContract):
                 "archipelago_version": ap_version,
                 "host_world_version": host_world_version,
                 "client_world_version": client_world_version,
-                "slot_name": slot_name
+                "slot_name": slot_name,
+                "seed": seed
         }
 
         session = {}
@@ -259,6 +376,7 @@ class ContractV1(CommunicationContract):
             "meta": meta,
             "options": options_,
             "slot_data": slot_data_,
+            "game_data": game_data_,
             "session": session
         }
 
@@ -331,6 +449,7 @@ class ContractV1(CommunicationContract):
         death_link: tuple[str, int, str] | None = params["death_link"]
         location_ids: set[int] | None = params["locations"]
         death_ack: int | None = params["death_ack"]
+        data_acks: list[int] | None = params["data_acks"]
 
         message: dict[str, Any] = {}
 
@@ -382,6 +501,9 @@ class ContractV1(CommunicationContract):
         if death_ack is not None:
             message["death_ack"] = death_ack
 
+        if data_acks is not None:
+            message["data_acks"] = list(data_acks)
+
         return cls.parse_events(message)
 
     @classmethod
@@ -408,6 +530,18 @@ class ContractV1(CommunicationContract):
                 message = None
                 raise GetOutOfHereError
             exit_code = parsed[1]
+        # read data
+        if message is not None:
+            data = message.get("data")
+            if data is not None:
+                try:
+                    parsed_data = OptionDataHandler.read_data(data)
+                except Exception:
+                    parsed_data = None
+                if parsed_data is None:
+                    message.pop("data")
+                else:
+                    message["data"] = parsed_data
         return {
             "message": message,
             "exit_code": exit_code

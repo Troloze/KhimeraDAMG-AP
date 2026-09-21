@@ -112,11 +112,10 @@ class AgentV1(CommunicationAgent):
         # Cleanup
         self._on_start()
 
-        # No need to error handle these, the .gsreq flag works to cover 
+        # No need to error handle these, the .gsreq flag works to cover
         # for errors here.
         self._send_connection_context()
         self._send_location_information()
-        
 
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
@@ -194,6 +193,7 @@ class AgentV1(CommunicationAgent):
         location_ids: set[int] | None = set()
         death_link: tuple[str, int, str] | None = None
         death_ack: int | None = None
+        data_acks: list[int] | None = []
         req_cctx = False
         req_li = False
         # heartbeat and ack should remember their last values instead of
@@ -210,6 +210,8 @@ class AgentV1(CommunicationAgent):
                 death_link = entry[1]
             if entry[0] == "death_ack":
                 death_ack = entry[1]
+            if entry[0] == "data_ack":
+                data_acks.append(entry[1])
             if entry[0] == "status":
                 self.last_connection_status = entry[1]
             if entry[0] == "req_cctx":
@@ -225,8 +227,18 @@ class AgentV1(CommunicationAgent):
             location_ids = None
         if len(messages) == 0:
             messages = None
+        if len(data_acks) == 0:
+            data_acks = None
 
-        ri = RuntimeInformation(item_list, location_ids, None, messages, death_link, death_ack, None, False)
+        ri = RuntimeInformation(
+            item_list=item_list,
+            locations=location_ids,
+            messages=messages,
+            data_acks=data_acks,
+            death_link=death_link,
+            death_ack=death_ack,
+            is_win=False,
+        )
         rs = (self.last_connection_status, heartbeat)
         req = (req_cctx, req_li)
 
@@ -243,13 +255,11 @@ class AgentV1(CommunicationAgent):
                     if queue_values[2][0]:
                         try:
                             self._send_connection_context()
-                            # logger.info("cctx sent")
                         except Exception:
                             logger.exception("Failed to re-send connection context")
                     if queue_values[2][1]:
                         try:
                             self._send_location_information()
-                            logger.info("li sent")
                         except Exception:
                             logger.exception("Failed to re-send location information")
                     try:
@@ -413,7 +423,8 @@ class AgentV1(CommunicationAgent):
             self.host_information_buffer.locations or
             self.host_information_buffer.messages or
             self.host_information_buffer.death_link or
-            self.host_information_buffer.death_ack
+            self.host_information_buffer.death_ack or
+            self.host_information_buffer.data_acks
         ):
             # Do not send an unnecessary empty message
             return
@@ -514,6 +525,7 @@ class AgentV1(CommunicationAgent):
         locations: set[int] | None = set(l_ids) if (l_ids := message.get("location_ids")) is not None else None
         death_data: dict[str, Any] | None = message.get("death_link")
         death_link: tuple[str, int, str] | None = None
+        data: list[tuple[int, str, Any]] | None = message.get("data")
         if (
             death_data is not None and
             isinstance(death_data, dict) and
@@ -561,6 +573,16 @@ class AgentV1(CommunicationAgent):
                     # Prioritize the newer
                     death_ack = death_ack if death_ack is not None else death_ack_
                     pass
+                data_: list[tuple[int, str, Any]] | None = message_.get("data")
+                if data is not None and data_ is not None:
+                    new_names = [names for _, names, _ in data]
+                    for entry in data_:
+                        if entry[1] in new_names:
+                            # prioritizes new information.
+                            continue
+                        data.append(entry)
+                if data is None:
+                    data = data_
                 __exit_code: int | None = game_information_.get("exit_code")  # Currently does nothing
 
         if locations is not None:
@@ -573,6 +595,9 @@ class AgentV1(CommunicationAgent):
         if location_acks is not None:
             for entry in location_acks:
                 self.gth_q.put(("location_ack", entry))
+        if data is not None:
+            for entry in data:
+                self.gth_q.put(("data", entry))
 
     def _receive_game_status_heartbeat(self) -> None:
         if self.gth_q is None or self.gth_q.is_shutdown:

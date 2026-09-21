@@ -169,6 +169,7 @@ class ConnectionContext:
     last_ack: int
     options: dict[str, Any]
     slot_data: dict[str, Any]
+    game_data: dict[str, Any]
     locations: set[int]
     item_list: list[tuple[int, NetworkItem]]
     has_goaled: bool
@@ -179,9 +180,11 @@ class ConnectionContext:
             "host_world_version":   self.host_world_version,
             "client_world_version": self.client_world_version,
             "slot_name":            self.slot_name,
+            "seed":                 self.seed,
             "last_ack":             self.last_ack,
             "options":              self.options,
-            "slot_data":            self.slot_data,
+            "slot_data":                 self.slot_data,
+            "game_data":                 self.game_data,
             "locations":            self.locations,
             "item_list":            self.item_list,
             "has_goaled":           self.has_goaled
@@ -206,6 +209,8 @@ class RuntimeInformation:
     locations: set[int] | None = None
     location_acks: set[int] | None = None
     messages: list[tuple[int, str]] | None = None
+    data: list[tuple[int, str, Any]] | None = None
+    data_acks: list[int] | None = None
     death_link: tuple[str, int, str] | None = None
     death_ack: int | None = None
     ack: int | None = None
@@ -219,6 +224,8 @@ class RuntimeInformation:
             "messages":         self.messages,
             "death_link":       self.death_link,
             "death_ack":        self.death_ack,
+            "data":             self.data,
+            "data_acks":         self.data_acks,
             "ack":              self.ack,
             "is_win":           self.is_win
         }
@@ -243,21 +250,27 @@ class RuntimeInformation:
             ):
                 self.death_ack = merger.death_ack
             # if self is not None, maintain
-            if (
-                self.death_link is None and
-                merger.death_link is not None
-            ):
+            if self.death_link is None:
                 self.death_link = merger.death_link
             if merger.item_list is not None:
                 self.item_list = (
                     merger.item_list +
                     [entry for entry in (self.item_list or []) if entry not in merger.item_list]
                 )
+            if merger.data_acks is not None:
+                self.data_acks = (
+                    merger.data_acks +
+                    [entry for entry in (self.data_acks or []) if entry not in merger.data_acks]
+                )
             if merger.messages is not None:
                 self.messages = (
                     merger.messages +
                     [entry for entry in (self.messages or []) if entry not in merger.messages]
                 )
+            if self.data is None:
+                # Only allow new information, whatever is lost will be re-sent.
+                self.data = merger.data
+                pass
         else:  # merger has newer information
             # if merger is not None, overwrite
             if merger.ack is not None:
@@ -276,9 +289,18 @@ class RuntimeInformation:
                     [entry for entry in (self.item_list or []) if entry not in merger.item_list] +
                     merger.item_list
                 )
+
+            if merger.data_acks is not None:
+                self.data_acks = (
+                    [entry for entry in (self.data_acks or []) if entry not in merger.data_acks] +
+                    merger.data_acks
+                )
             if merger.messages is not None:
                 self.messages = (
                     [entry for entry in (self.messages or []) if entry not in merger.messages] +
                     merger.messages
                 )
+            if merger.data is not None:
+                # Only allow new information, whatever is lost will be re-sent.
+                self.data = merger.data
         return self

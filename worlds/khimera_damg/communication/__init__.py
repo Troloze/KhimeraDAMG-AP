@@ -64,6 +64,15 @@ class KhimeraDAMGCommunicationInterface:
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
+    def send_data_acks(self, data_ids: list[int]) -> None:
+        for entry in data_ids:
+            self.send_data_ack(entry)
+
+    def send_data_ack(self, data_id: int) -> None:
+        pckg: tuple[str, Any] = ("data_ack", data_id)
+        with suppress(queue.ShutDown):
+            self._send_queue.put(pckg)
+
     def send_connection_status(self, is_connected: bool) -> None:
         pckg: tuple[str, Any] = ("status", int(is_connected))
         with suppress(queue.ShutDown):
@@ -148,6 +157,7 @@ class KhimeraDAMGCommunicationInterface:
         death_link: tuple[str, int, str] | None = None
         death_ack: int | None = None
         is_win: bool | None = False
+        data: list[tuple[int, str, Any]] | None = None
         for entry in incoming_data:
             if entry[1] is None:
                 continue
@@ -157,6 +167,10 @@ class KhimeraDAMGCommunicationInterface:
                 locations.add(entry[1])
             if entry[0] == "death_link":
                 death_link = entry[1]
+            if entry[0] == "data":
+                if data is None:
+                    data = []
+                data.append(entry[1])
             if entry[0] == "ack":
                 nack: int = entry[1]
                 if self.session_last_ack < nack:
@@ -179,6 +193,7 @@ class KhimeraDAMGCommunicationInterface:
             location_acks=location_acks,
             death_link=death_link,
             death_ack=death_ack,
+            data=data,
             ack=self.session_last_ack,
             is_win=is_win
         )
