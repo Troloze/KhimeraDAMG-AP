@@ -110,10 +110,10 @@ def create_and_connect_region(
         func = lambda state: state.has_all(
             [
                 stage_entrances[stage_lock],
-                stage_entrances[StageIndex.MT_AFROKUPA],
-                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.SKY_FORTRESS],
-                stage_entrances[StageIndex.PUMPKIN_VALLEY]
+                stage_entrances[StageIndex.MT_AFROKUPA],
+                stage_entrances[StageIndex.PUMPKIN_VALLEY],
+                stage_entrances[StageIndex.OIL_PLATFORM]
             ],
             world.player
         )
@@ -121,10 +121,10 @@ def create_and_connect_region(
         func = lambda state: state.has_all(
             [
                 stage_entrances[stage_lock],
-                stage_entrances[StageIndex.MT_AFROKUPA],
-                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.SKY_FORTRESS],
-                stage_entrances[StageIndex.PUMPKIN_VALLEY]
+                stage_entrances[StageIndex.MT_AFROKUPA],
+                stage_entrances[StageIndex.PUMPKIN_VALLEY],
+                stage_entrances[StageIndex.OIL_PLATFORM]
             ],
             world.player
         )
@@ -132,10 +132,10 @@ def create_and_connect_region(
         func = lambda state: state.has_all(
             [
                 stage_entrances[stage_lock],
-                stage_entrances[StageIndex.MT_AFROKUPA],
-                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.SKY_FORTRESS],
+                stage_entrances[StageIndex.MT_AFROKUPA],
                 stage_entrances[StageIndex.PUMPKIN_VALLEY],
+                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.THE_BLACK_WIDOW]
             ],
             world.player
@@ -144,10 +144,10 @@ def create_and_connect_region(
         func = lambda state: state.has_all(
             [
                 stage_entrances[stage_lock],
-                stage_entrances[StageIndex.MT_AFROKUPA],
-                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.SKY_FORTRESS],
+                stage_entrances[StageIndex.MT_AFROKUPA],
                 stage_entrances[StageIndex.PUMPKIN_VALLEY],
+                stage_entrances[StageIndex.OIL_PLATFORM],
                 stage_entrances[StageIndex.THE_BLACK_WIDOW],
                 stage_entrances[StageIndex.MECHANICAL_MAYHEM]
             ],

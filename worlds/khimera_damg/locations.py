@@ -65,46 +65,48 @@ boss_encounter_alias: str = f"{loc_type_to_name[LocType.MINIBOSS]} (?)"
 
 minibosses: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.MINIBOSS, 1, "Versus Pirates"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.MINIBOSS, 1, "Versus Wednesday"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.MINIBOSS, 1, "Versus Thursday"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.MINIBOSS, 1, "Versus Monday"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.MINIBOSS, 1, "Versus Wednesday"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.MINIBOSS, 1, "Versus Tuesday"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.MINIBOSS, 1, "Versus Thursday"),
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 1, "Versus Monday & Tuesday"),
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 2, "Versus Wednesday & Thursday"),
 
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 1, "Versus Serpantina", boss_encounter_alias),
-    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 2, "Versus Anchovy", boss_encounter_alias),
-    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 3, "Versus Pacifica", boss_encounter_alias),
-    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 4, "Versus Amelia", boss_encounter_alias),
-    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 5, "Versus Mimi", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 2, "Versus Amelia", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 3, "Versus Anchovy", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 4, "Versus Mimi", boss_encounter_alias),
+    _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.MINIBOSS, 5, "Versus Pacifica", boss_encounter_alias)
 ]
 
 clears: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.STAGE_CLEAR, 1),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 1),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.STAGE_CLEAR, 1),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.STAGE_CLEAR, 1),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 1),
+    
+    
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.THE_SPIDERS_WEB, LocType.STAGE_CLEAR, 1),
 
-    _make_loc(StageIndex.ICY_PATH, LocType.STAGE_CLEAR, 1),
-    _make_loc(StageIndex.BRINE_CAVE, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.TOWER_OF_POWER, LocType.STAGE_CLEAR, 1),
+    _make_loc(StageIndex.ICY_PATH, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.WINDY_WAY, LocType.STAGE_CLEAR, 1),
+    _make_loc(StageIndex.BRINE_CAVE, LocType.STAGE_CLEAR, 1),
 ]
 
 upgrades: LocList = [
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 2, "Saucy Shot Upgrade"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 2, "Mermaid Anchor Upgrade"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.STAGE_CLEAR, 2, "Harpy Boost Upgrade"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 2, "Saucy Shot Upgrade"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.STAGE_CLEAR, 2, "Treasure Box Upgrade"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 2, "Mermaid Anchor Upgrade"),
 
-    _make_loc(StageIndex.ICY_PATH, LocType.STAGE_CLEAR, 2, "Demon Fire Upgrade"),
-    _make_loc(StageIndex.BRINE_CAVE, LocType.STAGE_CLEAR, 2, "Sturdy Feet Upgrade"),
     _make_loc(StageIndex.TOWER_OF_POWER, LocType.STAGE_CLEAR, 2, "Giant's Wave Upgrade"),
+    _make_loc(StageIndex.ICY_PATH, LocType.STAGE_CLEAR, 2, "Demon Fire Upgrade"),
     _make_loc(StageIndex.WINDY_WAY, LocType.STAGE_CLEAR, 2, "Wicked Eye Upgrade"),
+    _make_loc(StageIndex.BRINE_CAVE, LocType.STAGE_CLEAR, 2, "Sturdy Feet Upgrade"),
 ]
 
 fairies: LocList = [
@@ -114,21 +116,21 @@ fairies: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.FAIRY, 2, "2"),
 
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 1, "1"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 2, "2"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 3, "3"),
-
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 1, "1"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 2, "2"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 3, "3"),
-
     _make_loc(StageIndex.SKY_FORTRESS, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.FAIRY, 2, "2"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.FAIRY, 3, "3"),
 
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 1, "1"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 2, "2"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.FAIRY, 3, "3"),
+
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.FAIRY, 2, "2"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.FAIRY, 3, "3"),
+
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 1, "1"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 2, "2"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.FAIRY, 3, "3"),
 
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.FAIRY, 2, "2"),
@@ -137,10 +139,10 @@ fairies: LocList = [
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.FAIRY, 2, "2"),
 
-    _make_loc(StageIndex.ICY_PATH, LocType.FAIRY, 1, "1"),
-    _make_loc(StageIndex.BRINE_CAVE, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.TOWER_OF_POWER, LocType.FAIRY, 1, "1"),
+    _make_loc(StageIndex.ICY_PATH, LocType.FAIRY, 1, "1"),
     _make_loc(StageIndex.WINDY_WAY, LocType.FAIRY, 1, "1"),
+    _make_loc(StageIndex.BRINE_CAVE, LocType.FAIRY, 1, "1"),
 ]
 
 # Harvest event books will be stored separately when implemented.
@@ -161,25 +163,25 @@ books: LocList = [
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.BOOK, 2, "2 (Floof Pirate)"),
     _make_loc(StageIndex.RAGAZZA_PLAINS, LocType.BOOK, 3, "3 (Chelshia)"),
 
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 1, "1 (Pirate Explorer)"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 2, "2 (Misboro)"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 3, "3 (Little Oni)"),
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 4, "4 (Anchovy)"),
-
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 1, "1 (Pacifica Oceania)"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 2, "2 (Pirate Swordsman)"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 3, "3 (Floof Bomber)"),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 4, "4 (Tamole)"),
-
     _make_loc(StageIndex.SKY_FORTRESS, LocType.BOOK, 1, "1 (Floof Aviator)"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.BOOK, 2, "2 (The Professor)"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.BOOK, 3, "3 (Pirate Cannoneer)"),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.BOOK, 4, "4 (Amelia)"),
 
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 1, "1 (Pirate Explorer)"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 2, "2 (Misboro)"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 3, "3 (Little Oni)"),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.BOOK, 4, "4 (Anchovy)"),
+
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.BOOK, 1, "1 (Zambot)"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.BOOK, 2, "2 (Seedle)"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.BOOK, 3, "3 (Mimi the Mimic)"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.BOOK, 4, "4 (Bernadette)"),
+
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 1, "1 (Pacifica Oceania)"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 2, "2 (Pirate Swordsman)"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 3, "3 (Floof Bomber)"),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.BOOK, 4, "4 (Tamole)"),
 
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.BOOK, 1, "1 (Pirate Samurai)"),
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.BOOK, 2, "2 (Weekday Witches)"),
@@ -188,33 +190,33 @@ books: LocList = [
 
     _make_loc(StageIndex.THE_SPIDERS_WEB, LocType.BOOK, 1, "1 (The Pirate Captain)"),
 
-    _make_loc(StageIndex.ICY_PATH, LocType.BOOK, 1, "1 (Skallo)"),
-    _make_loc(StageIndex.ICY_PATH, LocType.BOOK, 2, "2 (Chibeara)"),
-
-    _make_loc(StageIndex.BRINE_CAVE, LocType.BOOK, 1, "1 (Squidge)"),
-    _make_loc(StageIndex.BRINE_CAVE, LocType.BOOK, 2, "2 (Pirate Demolitions)"),
-
     _make_loc(StageIndex.TOWER_OF_POWER, LocType.BOOK, 1, "1 (Spaîctre Die)"),
     _make_loc(StageIndex.TOWER_OF_POWER, LocType.BOOK, 2, "2 (Estylia)"),
 
+    _make_loc(StageIndex.ICY_PATH, LocType.BOOK, 1, "1 (Skallo)"),
+    _make_loc(StageIndex.ICY_PATH, LocType.BOOK, 2, "2 (Chibeara)"),
+
     _make_loc(StageIndex.WINDY_WAY, LocType.BOOK, 1, "1 (Kiran)"),
     _make_loc(StageIndex.WINDY_WAY, LocType.BOOK, 2, "2 (Pirate Marksman)"),
+
+    _make_loc(StageIndex.BRINE_CAVE, LocType.BOOK, 1, "1 (Squidge)"),
+    _make_loc(StageIndex.BRINE_CAVE, LocType.BOOK, 2, "2 (Pirate Demolitions)"),
 
     _make_loc(StageIndex.CAKEBOY, LocType.BOOK, 1, "1 (Cakeboy)"),
 ]
 
 detonators: LocList = [
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.DETONATOR, 1),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.DETONATOR, 1),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.DETONATOR, 1),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.DETONATOR, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.DETONATOR, 1),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.DETONATOR, 1),
 ]
 
 gourmet_gal: LocList = [
-    _make_loc(StageIndex.MT_AFROKUPA, LocType.GOURMET_GAL, 1),
-    _make_loc(StageIndex.OIL_PLATFORM, LocType.GOURMET_GAL, 1),
     _make_loc(StageIndex.SKY_FORTRESS, LocType.GOURMET_GAL, 1),
+    _make_loc(StageIndex.MT_AFROKUPA, LocType.GOURMET_GAL, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.GOURMET_GAL, 1),
+    _make_loc(StageIndex.OIL_PLATFORM, LocType.GOURMET_GAL, 1),
 ]
 
 

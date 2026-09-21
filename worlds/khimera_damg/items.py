@@ -24,14 +24,14 @@ def make_item_id(item_type: ItemType, index: int) -> int:
 
 # ruff: disable[E501]
 upgrades: ItemDict = {
-    "Saucy Shot":       ItemData(make_item_id(ItemType.SKILLS, 1), ItemClassification.useful),
-    "Mermaid Anchor":   ItemData(make_item_id(ItemType.SKILLS, 2), ItemClassification.useful),
-    "Harpy Boost":      ItemData(make_item_id(ItemType.SKILLS, 3), ItemClassification.useful),
-    "Treasure Box":     ItemData(make_item_id(ItemType.SKILLS, 4), ItemClassification.useful),
-    "Demon Fire":       ItemData(make_item_id(ItemType.SKILLS, 5), ItemClassification.useful),
-    "Sturdy Feet":      ItemData(make_item_id(ItemType.SKILLS, 6), ItemClassification.useful),
-    "Giant's Wave":     ItemData(make_item_id(ItemType.SKILLS, 7), ItemClassification.useful),
-    "Wicked Eye":       ItemData(make_item_id(ItemType.SKILLS, 8), ItemClassification.useful)
+    "Harpy Boost":      ItemData(make_item_id(ItemType.SKILLS, 1), ItemClassification.useful),
+    "Saucy Shot":       ItemData(make_item_id(ItemType.SKILLS, 2), ItemClassification.useful),
+    "Treasure Box":     ItemData(make_item_id(ItemType.SKILLS, 3), ItemClassification.useful),
+    "Mermaid Anchor":   ItemData(make_item_id(ItemType.SKILLS, 4), ItemClassification.useful),
+    "Giant's Wave":     ItemData(make_item_id(ItemType.SKILLS, 5), ItemClassification.useful),
+    "Demon Fire":       ItemData(make_item_id(ItemType.SKILLS, 6), ItemClassification.useful),
+    "Wicked Eye":       ItemData(make_item_id(ItemType.SKILLS, 7), ItemClassification.useful),
+    "Sturdy Feet":      ItemData(make_item_id(ItemType.SKILLS, 8), ItemClassification.useful)
 }
 
 stage_unlocks: ItemDict = {
@@ -40,17 +40,17 @@ stage_unlocks: ItemDict = {
     stage_entrances[StageIndex.FAIRIES_DOMAIN]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 3), ItemClassification.progression),
     stage_entrances[StageIndex.QUIZ]:                   ItemData(make_item_id(ItemType.STAGE_UNLOCK, 4), ItemClassification.progression),
     stage_entrances[StageIndex.RAGAZZA_PLAINS]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 5), ItemClassification.progression),
-    stage_entrances[StageIndex.MT_AFROKUPA]:            ItemData(make_item_id(ItemType.STAGE_UNLOCK, 6), ItemClassification.progression),
-    stage_entrances[StageIndex.OIL_PLATFORM]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 7), ItemClassification.progression),
-    stage_entrances[StageIndex.SKY_FORTRESS]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 8), ItemClassification.progression),
-    stage_entrances[StageIndex.PUMPKIN_VALLEY]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 9), ItemClassification.progression),
+    stage_entrances[StageIndex.SKY_FORTRESS]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 6), ItemClassification.progression),
+    stage_entrances[StageIndex.MT_AFROKUPA]:            ItemData(make_item_id(ItemType.STAGE_UNLOCK, 7), ItemClassification.progression),
+    stage_entrances[StageIndex.PUMPKIN_VALLEY]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 8), ItemClassification.progression),
+    stage_entrances[StageIndex.OIL_PLATFORM]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 9), ItemClassification.progression),
     stage_entrances[StageIndex.THE_BLACK_WIDOW]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 10), ItemClassification.progression),
     stage_entrances[StageIndex.MECHANICAL_MAYHEM]:      ItemData(make_item_id(ItemType.STAGE_UNLOCK, 11), ItemClassification.progression),
     stage_entrances[StageIndex.THE_SPIDERS_WEB]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 12), ItemClassification.progression),
-    stage_entrances[StageIndex.ICY_PATH]:               ItemData(make_item_id(ItemType.STAGE_UNLOCK, 13), ItemClassification.progression),
-    stage_entrances[StageIndex.BRINE_CAVE]:             ItemData(make_item_id(ItemType.STAGE_UNLOCK, 14), ItemClassification.progression),
-    stage_entrances[StageIndex.TOWER_OF_POWER]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 15), ItemClassification.progression),
-    stage_entrances[StageIndex.WINDY_WAY]:              ItemData(make_item_id(ItemType.STAGE_UNLOCK, 16), ItemClassification.progression),
+    stage_entrances[StageIndex.TOWER_OF_POWER]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 13), ItemClassification.progression),
+    stage_entrances[StageIndex.ICY_PATH]:               ItemData(make_item_id(ItemType.STAGE_UNLOCK, 14), ItemClassification.progression),
+    stage_entrances[StageIndex.WINDY_WAY]:              ItemData(make_item_id(ItemType.STAGE_UNLOCK, 15), ItemClassification.progression),
+    stage_entrances[StageIndex.BRINE_CAVE]:             ItemData(make_item_id(ItemType.STAGE_UNLOCK, 16), ItemClassification.progression)
 }
 
 fairies: ItemDict = {
@@ -100,17 +100,17 @@ books: ItemDict = {
 }
 
 detonators: ItemDict = {
-    stage_to_detonator_item_index[StageIndex.ICY_PATH]:         ItemData(make_item_id(ItemType.DETONATOR, 1), ItemClassification.progression),
-    stage_to_detonator_item_index[StageIndex.BRINE_CAVE]:       ItemData(make_item_id(ItemType.DETONATOR, 2), ItemClassification.progression),
-    stage_to_detonator_item_index[StageIndex.TOWER_OF_POWER]:   ItemData(make_item_id(ItemType.DETONATOR, 3), ItemClassification.progression),
-    stage_to_detonator_item_index[StageIndex.WINDY_WAY]:        ItemData(make_item_id(ItemType.DETONATOR, 4), ItemClassification.progression)
+    stage_to_detonator_item_index[StageIndex.TOWER_OF_POWER]:   ItemData(make_item_id(ItemType.DETONATOR, 1), ItemClassification.progression),
+    stage_to_detonator_item_index[StageIndex.ICY_PATH]:         ItemData(make_item_id(ItemType.DETONATOR, 2), ItemClassification.progression),
+    stage_to_detonator_item_index[StageIndex.WINDY_WAY]:        ItemData(make_item_id(ItemType.DETONATOR, 3), ItemClassification.progression),
+    stage_to_detonator_item_index[StageIndex.BRINE_CAVE]:       ItemData(make_item_id(ItemType.DETONATOR, 4), ItemClassification.progression),
 }
 
 gourmet_upgrades: ItemDict = {
     "Gourmet Chicken":  ItemData(make_item_id(ItemType.GOURMET_GAL, 1), ItemClassification.useful),
     "Gourmet Pizza":    ItemData(make_item_id(ItemType.GOURMET_GAL, 2), ItemClassification.useful),
     "Gourmet Burger":   ItemData(make_item_id(ItemType.GOURMET_GAL, 3), ItemClassification.useful),
-    "Gourmet Calamari": ItemData(make_item_id(ItemType.GOURMET_GAL, 4), ItemClassification.useful)
+    "Gourmet Calamari": ItemData(make_item_id(ItemType.GOURMET_GAL, 4), ItemClassification.useful),
 }
 
 filler: ItemDict = {
