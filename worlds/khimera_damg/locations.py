@@ -85,8 +85,8 @@ clears: LocList = [
     _make_loc(StageIndex.MT_AFROKUPA, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.STAGE_CLEAR, 1),
-    
-    
+
+
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.MECHANICAL_MAYHEM, LocType.STAGE_CLEAR, 1),
     _make_loc(StageIndex.THE_SPIDERS_WEB, LocType.STAGE_CLEAR, 1),

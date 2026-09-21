@@ -86,7 +86,6 @@ This message will be a json with:
 			- Data names not contained here should be assumed as "not included" and a default value should be used.
 			- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
 			- All three lists must have the same length.
-
 - `"session"`: (dict)
 	- Contains information that might change throughout the archipelago session. 
 	- Holds the following fields:

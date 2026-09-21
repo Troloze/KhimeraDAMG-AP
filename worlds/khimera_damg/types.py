@@ -169,7 +169,7 @@ class ConnectionContext:
     seed: str
     last_ack: int
     options: dict[str, Any]
-    generation_info: dict[str, Any]
+    generation_information: dict[str, Any]
     game_data: dict[str, Any]
     locations: set[int]
     item_list: list[tuple[int, NetworkItem]]
@@ -177,18 +177,18 @@ class ConnectionContext:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "ap_version":           self.ap_version,
-            "host_world_version":   self.host_world_version,
-            "client_world_version": self.client_world_version,
-            "slot_name":            self.slot_name,
-            "seed":                 self.seed,
-            "last_ack":             self.last_ack,
-            "options":              self.options,
-            "generation_info":      self.generation_info,
-            "game_data":            self.game_data,
-            "locations":            self.locations,
-            "item_list":            self.item_list,
-            "has_goaled":           self.has_goaled
+            "ap_version":               self.ap_version,
+            "host_world_version":       self.host_world_version,
+            "client_world_version":     self.client_world_version,
+            "slot_name":                self.slot_name,
+            "seed":                     self.seed,
+            "last_ack":                 self.last_ack,
+            "options":                  self.options,
+            "generation_information":   self.generation_information,
+            "game_data":                self.game_data,
+            "locations":                self.locations,
+            "item_list":                self.item_list,
+            "has_goaled":               self.has_goaled
         }
 
 
