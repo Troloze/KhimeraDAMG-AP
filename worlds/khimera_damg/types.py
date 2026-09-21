@@ -169,7 +169,7 @@ class ConnectionContext:
     seed: str
     last_ack: int
     options: dict[str, Any]
-    slot_data: dict[str, Any]
+    generation_info: dict[str, Any]
     game_data: dict[str, Any]
     locations: set[int]
     item_list: list[tuple[int, NetworkItem]]
@@ -184,8 +184,8 @@ class ConnectionContext:
             "seed":                 self.seed,
             "last_ack":             self.last_ack,
             "options":              self.options,
-            "slot_data":                 self.slot_data,
-            "game_data":                 self.game_data,
+            "generation_info":      self.generation_info,
+            "game_data":            self.game_data,
             "locations":            self.locations,
             "item_list":            self.item_list,
             "has_goaled":           self.has_goaled

@@ -318,7 +318,7 @@ class ContractV1(CommunicationContract):
         seed: str = params["seed"]
         last_ack: int = params["last_ack"]
         options: dict[str, Any] = params["options"]
-        slot_data: dict[str, Any] = params["slot_data"]
+        generation_information: dict[str, Any] = params["generation_information"]
         game_data: dict[str, Any] = params["game_data"]
         locations: set[int] = params["locations"]
         item_list: list[tuple[int, NetworkItem]] = params["item_list"]
@@ -338,7 +338,7 @@ class ContractV1(CommunicationContract):
         seed = normalize_and_sanitize(seed)
 
         options_ = OptionDataHandler.format_option(options)
-        slot_data_ = OptionDataHandler.format_data(slot_data)
+        generation_information_ = OptionDataHandler.format_data(generation_information)
         game_data_ = OptionDataHandler.format_data(game_data)
 
         item_ids_ = [-1]
@@ -359,7 +359,9 @@ class ContractV1(CommunicationContract):
                 "host_world_version": host_world_version,
                 "client_world_version": client_world_version,
                 "slot_name": slot_name,
-                "seed": seed
+                "seed": seed,
+                "options": options_,
+                "generation_information": generation_information_
         }
 
         session = {}
@@ -371,12 +373,11 @@ class ContractV1(CommunicationContract):
             session["last_ack"] = last_ack
         if has_goaled:
             session["is_win"] = 1
+        if game_data_["count"] > 0:
+            session["game_data"] = game_data_
 
         message: dict[str, Any] = {
             "meta": meta,
-            "options": options_,
-            "slot_data": slot_data_,
-            "game_data": game_data_,
             "session": session
         }
 
