@@ -61,7 +61,7 @@ This will list connection information. Will be sent when the client first launch
 
 This message will be a json with:
 - `"meta"`: (dict)
-	- holds `"archipelago_version"`, `"host_world_version"`, `"client_world_version"`, and `"slot_name"` fields, each with a string value.
+	- holds `"archipelago_version"`, `"host_world_version"`, `"client_world_version"`, `"slot_name"`, and `"seed"` fields, each with a string value.
 - `"options"`: (dict)
 	- `"names"` Option names (list)
 	- `"types"` Option types (list)
@@ -75,7 +75,16 @@ This message will be a json with:
 	- `"names"` Data names (list)
 	- `"types"` Data types (list)
 	- `"values"` Data values (list)
-	- `"count"` Number of entries
+	- `"count"` Number of entries 
+	- The lists will be built so that name, type and value can be obtained from the index.
+	- Data names not contained here should be assumed as "not included" and a default value should be used.
+	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
+	- All three lists must have the same length.
+- `"game_data"`: (dict)
+	- `"names"` Data names (list)
+	- `"types"` Data types (list)
+	- `"values"` Data values (list)
+	- `"count"` Number of entries 
 	- The lists will be built so that name, type and value can be obtained from the index.
 	- Data names not contained here should be assumed as "not included" and a default value should be used.
 	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
@@ -126,6 +135,7 @@ This message will be a json with:
 	- `"item_ids"` with a list of all item ids (int)
 	- `"player_ids"` with a list of all the player ids (int) that sent the items
 	- `"item_indexes"` with a list of all the item indexes (int)
+	- `"count"` number of entries.
 	- Deliberately a diferent structure than `ap.cctx`'s item_list.
 	- All three lists must have the same length.
 - `"location_ids"` with a list of all location ids that were checked (either by the game or via collect commands)
@@ -134,10 +144,9 @@ This message will be a json with:
 	- Death link id is managed by the game.
 	- Whichever id it sends, the client just needs to send it back, no need to track state.
 	- If received multiple ids in between ticks, send the latest.
-
-The client will limit the amount of messages sent to the game on a tick, passing only the most recent ones to the game and discarding the rest. On file update, the client will append all items and death links; the messages, however, will be appended and if more than the set amount are present in the file, the older messages will be pruned so that the message count is back to the set amount.
-
-The game will have no way of "scrolling up" the list of messages so any message that would not be displayed (because they were pushed up by others) are not relevant. The exact value of the limit will be determined by the in-game message viewer implementation.
+- `"data_acks"` a list of acked data IDs sent by the client. (int)
+- The client will cap the number of messages up to a certain value, sending only the most recent.
+- The game will have no way of "scrolling up" the list of messages so any message that would not be displayed (because they were pushed up by others) are not relevant. The exact value of the limit will be determined by the in-game message viewer implementation.
 
 Messages sent by the user via the client will also be placed in the `ap.hi` and sent to the game.
 ### State flags.
@@ -163,13 +172,22 @@ This message will be a json with:
 			- E.g., "%s fell on a pit." rather than "Player1 fell on a pit."
 	- Sent every time until acked.
 	- If a new death link happens while another is still yet to be acked, send with the new information; archipelago should only take one death link from the same source at a time, so we should keep the latest one.
-	- The two lists must have the same length.
 - `"location_acks"` a list with all locations the game acknowledges (int)
 	- Sent every time the game receives a location message from the client.
 - `"death_ack"` the latest death link id received.
 	- Death link id is managed by the client.
 	- Whichever id it sends, the game just needs to send it back, no need to track state.
 	- If received multiple ids in between ticks, send the latest.
+- `"data"`: (dict)
+	- `"names"` Data names (list)
+	- `"ids"` Data ids (list)
+	- `"types"` Data types (list)
+	- `"values"` Data values (list)
+	- `"count"` Number of entries
+	- The lists will be built so that name, type and value can be obtained from the index.
+	- Type of `"value"` will be dictated by `"type"` (following the type treatment section at the end of the document)
+	- All four lists must have the same length.
+
 ### State Flags
 All client state flags will have an extension that starts with `.gs`.
 - `.gsreq`: Game requires connection information.
@@ -237,8 +255,7 @@ A basic list of strings.
 ### Dictionary (D)
 A basic dictionary.
 - All keys must be strings
-- Values must be either integer, string, or lists
-- lists can have either integers or strings, but never both.
+- Values must be either integer or string
 # Changelog
 ## V1
 Introduced json and flag state files for communication.

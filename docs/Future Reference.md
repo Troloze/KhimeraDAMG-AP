@@ -16,6 +16,7 @@ These will be implemented eventually.
 # Client
 - Command for launching the game.
 - Command for restarting internal communication systems.
+- Implement data handling commands
 
 # Launcher
 - Launcher will store the pid, auth information (name, password, room url, port), and host apworld version of the latest successful game launch + connection
