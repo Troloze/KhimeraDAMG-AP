@@ -22,36 +22,39 @@ class KhimeraDAMGItem(Item):
 
 
 class StageIndex(IntEnum):
-    # Any/None/Some; Whatever doesn't fit in a single stage index goes here
-    GENERAL = 0
-
+    """ Matches the internal IDS used by the game, do NOT change the indexes. """
     # Friendly stages
-    RAGAZZA_TOWN = 1
-    CHELSHIAS_HOUSE = 2
-    FAIRIES_DOMAIN = 3
-    QUIZ = 4
+    RAGAZZA_TOWN = 9
+    FAIRIES_DOMAIN = 13
+    CHELSHIAS_HOUSE = 14
+    QUIZ = 16
 
     # Main Stages
-    RAGAZZA_PLAINS = 5
-    SKY_FORTRESS = 6
-    MT_AFROKUPA = 7
-    PUMPKIN_VALLEY = 8
-    OIL_PLATFORM = 9
+    RAGAZZA_PLAINS = 0
+    SKY_FORTRESS = 1
+    MT_AFROKUPA = 2
+    PUMPKIN_VALLEY = 3
+    OIL_PLATFORM = 4
+
+    # Extra Stages
+    TOWER_OF_POWER = 5
+    ICY_PATH = 6
+    WINDY_WAY = 7
+    BRINE_CAVE = 8
+
+    # Final Stages
     THE_BLACK_WIDOW = 10
     MECHANICAL_MAYHEM = 11
     THE_SPIDERS_WEB = 12
 
-    # Extra Stages
-    TOWER_OF_POWER = 13
-    ICY_PATH = 14
-    WINDY_WAY = 15
-    BRINE_CAVE = 16
-
     # Harvest Event
     HARVEST_EVENT = 17
 
-    # Cakeboy
+    # CREDITS = 15  # No locations will ever be sent here, even the game never writes state changes to id 15
+
+    # Not tracked by the internal ids
     CAKEBOY = 18
+    OTHER = 19
 
 
 class ItemType(IntEnum):
@@ -70,12 +73,12 @@ class ItemType(IntEnum):
 class LocType(IntEnum):
     GENERAL = 0
     STAGE_CLEAR = 1
-    MINIBOSS = 2
-    FAIRY = 3
-    BOOK = 4
-    # CANDY = 5
-    DETONATOR = 6
-    GOURMET_GAL = 7
+    FAIRY = 2
+    BOOK = 3
+    # CANDY = 4
+    DETONATOR = 5
+    GOURMET_GAL = 6
+    MINIBOSS = 7
 
 
 class LocData(NamedTuple):
@@ -90,7 +93,7 @@ class ItemData(NamedTuple):
 
 
 stage_id_to_name: dict[StageIndex, str] = {
-    StageIndex.GENERAL:             "General",
+    StageIndex.OTHER:               "Other",
     StageIndex.RAGAZZA_TOWN:        "Ragazza Town",
     StageIndex.CHELSHIAS_HOUSE:     "Chelshia's House",
     StageIndex.FAIRIES_DOMAIN:      "The Fairies Domain",

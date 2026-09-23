@@ -25,7 +25,7 @@ LocList = list[LocTuple]
 # It is available at the docs folder in the apworld github repository
 def _make_name(stage: StageIndex, loc_type: LocType | str, identifier: str | None = None) -> str:
     name = ""
-    if stage != StageIndex.GENERAL:
+    if stage != StageIndex.OTHER:
         name = f"{name}{stage_id_to_name[stage]}: "
     if isinstance(loc_type, str):
         name = f"{name}{loc_type}"
