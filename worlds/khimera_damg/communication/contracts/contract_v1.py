@@ -365,12 +365,11 @@ class ContractV1(CommunicationContract):
         }
 
         session = {}
+        session["last_ack"] = last_ack
         if count_ > 0:
             session["item_list"] = item_list_
         if len(locations) > 0:
             session["location_ids"] = list(locations)
-        if last_ack > 0:
-            session["last_ack"] = last_ack
         if has_goaled:
             session["is_win"] = 1
         if game_data_["count"] > 0:

@@ -22,7 +22,7 @@ def create_regions(world: "KhimeraDAMGWorld") -> None:
     region_stages: dict[str, StageIndex] = {}
 
     for stage, name in stage_id_to_name.items():
-        if stage in [StageIndex.GENERAL, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
+        if stage in [StageIndex.OTHER, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
             continue
         regions[name] = create_and_connect_region(world, name, f"{name} Entrance", world_map, stage)
         region_stages[name] = stage

@@ -7,5 +7,7 @@ Once the list is exhausted, check Future Reference.md in /docs for more things t
 If that's exhausted as well, it's probably time to make a release.
 
 **Todo before sending a PR**
+- Update session information on reconnect.
+    - Currently, the agent stores a cctx and it isn't replaced.
 
 **Todo right after sending the PR** 

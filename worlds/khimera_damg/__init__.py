@@ -112,7 +112,7 @@ class KhimeraDAMGWorld(World):
                 "shuffle_detonators",
                 "shuffle_gourmet_gal"
             ),
-            "data": {},
+            "generation_information": {},
             "is_race": self.multiworld.is_race,
             "location_information": li
         }

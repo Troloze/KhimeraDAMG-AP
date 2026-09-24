@@ -198,7 +198,7 @@ def create_items(world: "KhimeraDAMGWorld") -> None:
     unfilled: int = len(world.multiworld.get_unfilled_locations(world.player))
     # Entrance Items
     for stage in stage_id_to_name:
-        if stage in [StageIndex.GENERAL, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
+        if stage in [StageIndex.OTHER, StageIndex.HARVEST_EVENT, StageIndex.CAKEBOY]:
             continue
         entrance_item = world.create_item(stage_entrances[stage])
         if stage in world.starting_locations:
