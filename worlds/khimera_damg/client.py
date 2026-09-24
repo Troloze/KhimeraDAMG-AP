@@ -550,7 +550,7 @@ class KhimeraDAMGContext(CommonContext):
             return False
         return True
 
-    async def _start_up_game_processes(self) -> None:
+    def _make_cctx(self) -> ConnectionContext:
         last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0)  # type: ignore
         items = self.items_received  # Accessed asynchronously, state can change between a loop's readings
         item_list = [(i + 1, items[i]) for i in range(0, len(items))]
@@ -559,7 +559,7 @@ class KhimeraDAMGContext(CommonContext):
         is_win = win_status == ClientStatus.CLIENT_GOAL
         # This will return the entirety of the "game_data" category.
         game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {})  # type: ignore
-        self.cctx = ConnectionContext(
+        cctx = ConnectionContext(
             ap_version=Utils.__version__,
             host_world_version=self.host_world_version,  # type: ignore
             client_world_version=APWORLD_VERSION,
@@ -573,6 +573,11 @@ class KhimeraDAMGContext(CommonContext):
             item_list=item_list,
             has_goaled=is_win
         )
+        return cctx
+
+    async def _start_up_game_processes(self) -> None:
+        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0)  # type: ignore
+        self.cctx = self._make_cctx()
         self.li = LocationInformation(
             not self.slot_data["is_race"],
             self.slot_data["location_information"]
@@ -625,14 +630,13 @@ class KhimeraDAMGContext(CommonContext):
             logger.warning("Server took too long to send win information, starting anyways.")
 
         # Start
-        if (
-            self.communication_interface is None or
-            not self.communication_interface.authenticate(self.slot_name, self.host_seed)  # type: ignore
-        ):
+        if self.communication_interface is None:
             try:
                 await self._start_up_game_processes()
             except Exception:
                 logger.exception("Khimera setup failed; server connection remains active.")
+        else:
+            self.communication_interface.reconnect(self._make_cctx())
 
         if self.server_loop_task is None:
             self.server_loop_task = asyncio.create_task(self._server_loop())

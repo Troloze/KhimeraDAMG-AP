@@ -24,3 +24,6 @@ These will be implemented eventually.
   - Launcher will to verify if the pid is still running. 
   - Then the communication handler will verify the game's heartbeat.
   - An automatic reconnection attempt will be made.
+Closing the game and opening it again will cause the agent to issue an outdated cctx.
+  - Since the launcher will be the only (expected) way to open the game, a way to update the cctx will be needed.
+  - Perhaps one could repurpose the reconnect function that is already working, and change its name to update_context.

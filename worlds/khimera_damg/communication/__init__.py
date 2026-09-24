@@ -120,6 +120,12 @@ class KhimeraDAMGCommunicationInterface:
                 self._send_queue.shutdown()
                 self._get_queue.shutdown()
 
+    def reconnect(self, connection_context: ConnectionContext):
+        if self.agent is None:
+            return
+        self.agent.reconnect(connection_context)
+        
+
     def authenticate(self, slot_name: str, seed: str) -> bool:
         """Returns false when the credentials do not match."""
         if self.slot_name is None or self.seed is None:

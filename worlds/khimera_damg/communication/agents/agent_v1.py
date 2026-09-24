@@ -104,7 +104,8 @@ class AgentV1(CommunicationAgent):
     ) -> None:
         self.htg_q = htg_q  # Host-to-Game Queue (send)
         self.gth_q = gth_q  # Game-to-Host Queue (get)
-        self.connection_context = connection_context
+        with self.context_lock:
+            self.connection_context = connection_context
         self.location_information = location_information
         if htg_q.is_shutdown or gth_q.is_shutdown:
             raise ValueError("One of the provided queues has been shutdown.")
@@ -126,6 +127,10 @@ class AgentV1(CommunicationAgent):
         ).start()
 
         self.communication_opened = True
+
+    def reconnect(self, connection_context: ConnectionContext):
+        with self.context_lock:
+            self.connection_context = connection_context
 
     def close_communication(self) -> None:
         self.communication_closed = True
@@ -153,6 +158,7 @@ class AgentV1(CommunicationAgent):
         self.time_since_last_heartbeat_update: float = -1
         self._test_sandbox_access()  # Needs to be on init so game status update can be detected.
         self.thread_exit = threading.Event()
+        self.context_lock:threading.Lock = threading.Lock()
 
     def _on_start(self) -> None:
         for file in self._cleanup_target_files:
@@ -399,7 +405,8 @@ class AgentV1(CommunicationAgent):
         return ret
 
     def _send_connection_context(self) -> None:
-        cctx = self.connection_context
+        with self.context_lock:
+            cctx = self.connection_context
         message, _exit_code = self.contract.write_content("cctx", cctx.to_dict())
 
         self._write_file("ap.cctx", message)
@@ -521,6 +528,8 @@ class AgentV1(CommunicationAgent):
         message: dict[str, Any] | None = game_information.get("message")
         if message is None or not isinstance(message, dict):
             return
+        with self.context_lock:
+            context_copy = self.connection_context
 
         locations: set[int] | None = set(l_ids) if (l_ids := message.get("location_ids")) is not None else None
         death_data: dict[str, Any] | None = message.get("death_link")
@@ -534,9 +543,9 @@ class AgentV1(CommunicationAgent):
         ):
             # We receive a structure, not the built message,
             # so we have to insert the slot name here.
-            dl_msg: str = death_data.get("message", "").replace("%s", self.connection_context.slot_name)
-
-            death_link = (self.connection_context.slot_name, death_data["id"], dl_msg)
+            
+            dl_msg: str = death_data.get("message", "").replace("%s", context_copy.slot_name)
+            death_link = (context_copy.slot_name, death_data["id"], dl_msg)
         location_acks: set[int] | None = set(l_ids) if (l_ids := message.get("location_acks")) is not None else None
         death_ack: int | None = message.get("death_ack")
         _exit_code: int | None = game_information.get("exit_code")  # Currently does nothing
@@ -562,8 +571,8 @@ class AgentV1(CommunicationAgent):
                         isinstance(death_data_.get("id"), int) and
                         isinstance(death_data_.get("message"), str)
                     ):
-                        dl_msg_: str = death_data_.get("message", "").replace("%s", self.connection_context.slot_name)
-                        death_link = (self.connection_context.slot_name, death_data_["id"], dl_msg_)
+                        dl_msg_: str = death_data_.get("message", "").replace("%s", context_copy.slot_name)
+                        death_link = (context_copy.slot_name, death_data_["id"], dl_msg_)
                 location_acks_: set[int] | None = \
                     set(l_ids) if (l_ids := message_.get("location_acks")) is not None else None
                 if location_acks_ is not None:
