@@ -7,7 +7,7 @@ from worlds.LauncherComponents import Component, Type, components, icon_paths  #
 from worlds.LauncherComponents import launch as launch_component  # type: ignore
 
 from .generation_options import KhimeraDAMGOptions, create_option_groups
-from .items import create_item, create_items, get_filler, item_groups, item_table, update_item_classification
+from .items import create_item, create_items, default_filler, item_groups, item_table, update_item_classification
 from .locations import apply_goal_logic, apply_location_rules, loc_table
 from .regions import create_regions
 from .types import KhimeraDAMGItem, StageIndex
@@ -118,7 +118,7 @@ class KhimeraDAMGWorld(World):
         }
 
     def get_filler_item_name(self) -> str:
-        return get_filler(self)
+        return default_filler
 
     def create_item(self, name: str) -> KhimeraDAMGItem:
         return create_item(self, name)

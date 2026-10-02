@@ -1,7 +1,10 @@
+
+from math import ceil
 from typing import TYPE_CHECKING
 
 from BaseClasses import ItemClassification  # type: ignore
 
+from .generation_options import KiranDriveByTrap, make_trap_weights
 from .types import (
     ItemData,
     ItemType,
@@ -34,27 +37,31 @@ upgrades: ItemDict = {
     "Sturdy Feet":      ItemData(make_item_id(ItemType.SKILLS, 8), ItemClassification.useful)
 }
 
+
 stage_unlocks: ItemDict = {
-    stage_entrances[StageIndex.RAGAZZA_TOWN]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 1), ItemClassification.progression),
-    stage_entrances[StageIndex.CHELSHIAS_HOUSE]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 2), ItemClassification.progression),
-    stage_entrances[StageIndex.FAIRIES_DOMAIN]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 3), ItemClassification.progression),
-    stage_entrances[StageIndex.QUIZ]:                   ItemData(make_item_id(ItemType.STAGE_UNLOCK, 4), ItemClassification.progression),
-    stage_entrances[StageIndex.RAGAZZA_PLAINS]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 5), ItemClassification.progression),
-    stage_entrances[StageIndex.SKY_FORTRESS]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 6), ItemClassification.progression),
-    stage_entrances[StageIndex.MT_AFROKUPA]:            ItemData(make_item_id(ItemType.STAGE_UNLOCK, 7), ItemClassification.progression),
-    stage_entrances[StageIndex.PUMPKIN_VALLEY]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 8), ItemClassification.progression),
-    stage_entrances[StageIndex.OIL_PLATFORM]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 9), ItemClassification.progression),
-    stage_entrances[StageIndex.THE_BLACK_WIDOW]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 10), ItemClassification.progression),
-    stage_entrances[StageIndex.MECHANICAL_MAYHEM]:      ItemData(make_item_id(ItemType.STAGE_UNLOCK, 11), ItemClassification.progression),
-    stage_entrances[StageIndex.THE_SPIDERS_WEB]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 12), ItemClassification.progression),
-    stage_entrances[StageIndex.TOWER_OF_POWER]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 13), ItemClassification.progression),
-    stage_entrances[StageIndex.ICY_PATH]:               ItemData(make_item_id(ItemType.STAGE_UNLOCK, 14), ItemClassification.progression),
-    stage_entrances[StageIndex.WINDY_WAY]:              ItemData(make_item_id(ItemType.STAGE_UNLOCK, 15), ItemClassification.progression),
-    stage_entrances[StageIndex.BRINE_CAVE]:             ItemData(make_item_id(ItemType.STAGE_UNLOCK, 16), ItemClassification.progression)
+    stage_entrances[StageIndex.RAGAZZA_PLAINS]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 1), ItemClassification.progression),
+    stage_entrances[StageIndex.SKY_FORTRESS]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 2), ItemClassification.progression),
+    stage_entrances[StageIndex.MT_AFROKUPA]:            ItemData(make_item_id(ItemType.STAGE_UNLOCK, 3), ItemClassification.progression),
+    stage_entrances[StageIndex.PUMPKIN_VALLEY]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 4), ItemClassification.progression),
+    stage_entrances[StageIndex.OIL_PLATFORM]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 5), ItemClassification.progression),
+    stage_entrances[StageIndex.TOWER_OF_POWER]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 6), ItemClassification.progression),
+    stage_entrances[StageIndex.ICY_PATH]:               ItemData(make_item_id(ItemType.STAGE_UNLOCK, 7), ItemClassification.progression),
+    stage_entrances[StageIndex.WINDY_WAY]:              ItemData(make_item_id(ItemType.STAGE_UNLOCK, 8), ItemClassification.progression),
+    stage_entrances[StageIndex.BRINE_CAVE]:             ItemData(make_item_id(ItemType.STAGE_UNLOCK, 9), ItemClassification.progression),
+    stage_entrances[StageIndex.RAGAZZA_TOWN]:           ItemData(make_item_id(ItemType.STAGE_UNLOCK, 10), ItemClassification.progression),
+    stage_entrances[StageIndex.THE_BLACK_WIDOW]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 11), ItemClassification.progression),
+    stage_entrances[StageIndex.MECHANICAL_MAYHEM]:      ItemData(make_item_id(ItemType.STAGE_UNLOCK, 12), ItemClassification.progression),
+    stage_entrances[StageIndex.THE_SPIDERS_WEB]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 13), ItemClassification.progression),
+    stage_entrances[StageIndex.FAIRIES_DOMAIN]:         ItemData(make_item_id(ItemType.STAGE_UNLOCK, 14), ItemClassification.progression),
+    stage_entrances[StageIndex.CHELSHIAS_HOUSE]:        ItemData(make_item_id(ItemType.STAGE_UNLOCK, 15), ItemClassification.progression),
+    # Skip unlock 16, it would map to the credits room which doesn't have an unlock.
+    stage_entrances[StageIndex.QUIZ]:                   ItemData(make_item_id(ItemType.STAGE_UNLOCK, 17), ItemClassification.progression),
 }
 
+
 fairies: ItemDict = {
-    "Fairy": ItemData(make_item_id(ItemType.FAIRY, 1), ItemClassification.filler)
+    # Not filler so we don't accidentally lock berserk mode on unbalanced games
+    "Fairy": ItemData(make_item_id(ItemType.FAIRY, 1), ItemClassification.useful)
 }
 
 # Harvest event log books will be placed in a separate category when implemented, but are all books regardless.
@@ -114,20 +121,22 @@ gourmet_upgrades: ItemDict = {
 }
 
 filler: ItemDict = {
-    "Coin": ItemData(make_item_id(ItemType.FILLER, 1), ItemClassification.filler),
-    "Small Gem": ItemData(make_item_id(ItemType.FILLER, 2), ItemClassification.filler),
-    "Gem": ItemData(make_item_id(ItemType.FILLER, 3), ItemClassification.filler),
-    "Large Gem": ItemData(make_item_id(ItemType.FILLER, 4), ItemClassification.filler),
-    "Food": ItemData(make_item_id(ItemType.FILLER, 5), ItemClassification.filler),
+    "Coin Drop": ItemData(make_item_id(ItemType.FILLER, 1), ItemClassification.filler),
+    "Small Treasure Drop": ItemData(make_item_id(ItemType.FILLER, 2), ItemClassification.filler),
+    "Big Treasure Drop": ItemData(make_item_id(ItemType.FILLER, 3), ItemClassification.filler),
+    "Food Drop": ItemData(make_item_id(ItemType.FILLER, 4), ItemClassification.filler),
+    "Kiran Drive-Thru": ItemData(make_item_id(ItemType.FILLER, 5), ItemClassification.filler)
 }
 
 filler_weights: dict[str, int] = {
-    "Coin": 30,
-    "Small Gem": 20,
-    "Gem": 10,
-    "Large Gem": 5,
-    "Food": 5
+    "Coin Drop": 10,
+    "Small Treasure Drop": 5,
+    "Big Treasure Drop": 3,
+    "Food Drop": 5,
+    "Kiran Drive-Thru": 3
 }
+
+default_filler = "Coin Drop"
 
 
 # Ensure parity between filler and filler_weights, checked at apworld loading so it is caught early on testing.
@@ -138,12 +147,8 @@ def validate_filler() -> None:
 
 validate_filler()
 
-filler_item_names: list[str] = list(filler_weights.keys())
-filler_item_weights: list[int] = list(filler_weights.values())
-
-# Not currently added to item table; the first alpha release won't have traps.
 traps: ItemDict = {
-    "Cannonball Trap": ItemData(make_item_id(ItemType.TRAPS, 1), ItemClassification.trap),
+    "Balls Trap": ItemData(make_item_id(ItemType.TRAPS, 1), ItemClassification.trap),
     "Floof Aviator Swarm Trap": ItemData(make_item_id(ItemType.TRAPS, 2), ItemClassification.trap),
     "Kiran Drive-By Trap": ItemData(make_item_id(ItemType.TRAPS, 3), ItemClassification.trap),
     "Box Trap": ItemData(make_item_id(ItemType.TRAPS, 4), ItemClassification.trap),
@@ -167,7 +172,8 @@ item_table = {
     **books,
     **detonators,
     **gourmet_upgrades,
-    **filler
+    **filler,
+    **traps
 }
 
 # ruff: enable[E501]
@@ -178,11 +184,6 @@ def update_item_classification(world: "KhimeraDAMGWorld") -> None:
         world.progression_overrides["Harpy Boost"] = ItemClassification.progression
         if world.options.shuffle_fairies:
             world.progression_overrides["Fairy"] = ItemClassification.progression_deprioritized_skip_balancing
-
-
-def get_filler(world: "KhimeraDAMGWorld") -> str:
-    # No trap logic yet
-    return world.random.choices(filler_item_names, weights=filler_item_weights)[0]
 
 
 def create_item(world: "KhimeraDAMGWorld", name: str) -> KhimeraDAMGItem:
@@ -236,5 +237,22 @@ def create_items(world: "KhimeraDAMGWorld") -> None:
     world.multiworld.itempool += itempool
     filler_count = unfilled - itempool_count
     if filler_count > 0:
-        for _ in range(filler_count):
-            world.multiworld.itempool.append(world.create_filler())
+        trap_count = ceil((filler_count * world.options.trap_weight) / 100.0)
+        filler_item_names: list[str] = list(filler.keys())
+        if world.options.kiran_drive_by_trap == KiranDriveByTrap.option_disabled:
+            # Kiran Drive-Thru is only available when Kiran Drive-By is enabled
+            filler_item_names.remove("Kiran Drive-Thru")
+        filler_item_weights: list[int] = [filler_weights[name] for name in filler_item_names]
+        trap_map = make_trap_weights(world)
+        trap_item_names: list[str] = list(trap_map.keys())
+        trap_item_weights: list[int] = list(trap_map.values())
+        if not any(trap_item_weights):
+            # All values are zero
+            trap_count = 0
+        for i in range(filler_count):
+            if i < trap_count:
+                trap_item = world.random.choices(trap_item_names, trap_item_weights)[0]
+                world.multiworld.itempool.append(world.create_item(trap_item))
+            else:
+                filler_item = world.random.choices(filler_item_names, filler_item_weights)[0]
+                world.multiworld.itempool.append(world.create_item(filler_item))

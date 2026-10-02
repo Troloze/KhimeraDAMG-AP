@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import threading
 import time
 from copy import deepcopy
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import Utils  # type: ignore
-import yaml
 from CommonClient import (  # type: ignore
     ClientCommandProcessor,
     ClientStatus,
@@ -22,9 +19,10 @@ from CommonClient import (  # type: ignore
 )
 from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ignore
 
-from . import APWORLD_VERSION, GAME_ID
+from . import APWORLD_VERSION
 from .communication import KhimeraDAMGCommunicationInterface
 from .launcher import KhimeraDAMGLauncher
+from .storage import KhimeraDAMGStorageHandler
 from .types import ConnectionContext, LocationInformation, RuntimeInformation
 
 if TYPE_CHECKING:
@@ -43,101 +41,228 @@ class KhimeraDAMGJSONToTextParser(JSONtoTextParser):
 class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
     continue_timeout: ClassVar[float] = 60.0
 
-    def __init__(self, ctx: CommonContext) -> None:
+    def __init__(self, ctx: KhimeraDAMGContext) -> None:
         super().__init__(ctx)
+        self.ctx = ctx
+        self.command_running: bool = False
         self.continue_context: str | None = None
+        self.continue_args: dict | None = None
         self.continue_time: float | None = None
 
-    def _cmd_force_win(self) -> None:
-        """ DEBUG COMMAND.\nForces a win """
-        self.continue_context = None
-        self.continue_time = None
-        if isinstance(self.ctx, KhimeraDAMGContext):
-            Utils.async_start(self.ctx.send_msgs(
-                [{"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}]
-            ))
+    if (False):  # Debug commands, not available for the actual release of the apworld
+        def _cmd_force_win(self) -> None:
+            """ DEBUG COMMAND.\nForces a win """
+            # Deliberately doesn't check for command_running.
+            self.continue_context = None
+            self.continue_time = None
+            self.continue_args = None
+            if isinstance(self.ctx, KhimeraDAMGContext):
+                Utils.async_start(self.ctx.send_msgs(
+                    [{"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}]
+                ))
+
+        def _cmd_die(self) -> None:
+            """ DEBUG COMMAND.\nSends a fake death link signal to the game."""
+            # Deliberately doesn't check for command_running.
+            self.continue_context = None
+            self.continue_time = None
+            self.continue_args = None
+            if isinstance(self.ctx, KhimeraDAMGContext):
+                if self.ctx.communication_interface is not None:
+                    self.ctx.communication_interface.send_death_link("", -1, "")
 
     def _cmd_status(self) -> None:
         """Check Khimera DAMG Connection State"""
+        # Deliberately doesn't check for command_running.
         self.continue_context = None
         self.continue_time = None
+        self.continue_args = None
         if isinstance(self.ctx, KhimeraDAMGContext):
             logger.info(self.ctx.get_khimera_damg_status())
 
-    def _cmd_export_game_data(self) -> None:
+    def _cmd_export_game_data(self, seed: str = "", slot_name: str = "") -> None:
         """
-            [ DOES NOT WORK AT THE MOMENT ]
-            Requires connection.
             Exports a copy of the stored game data for the currently loaded slot.
+            If seed and slot_name is provided, you can export data from a non-connected slot (as long as it exists)
             Import it using import game data.
+
+            :param seed: The seed of the hosted game.
+            :param slot_name: The name of your slot. Use quotes if the name contains spaces.
         """
-        # Check if the slot is connected.
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
         self.continue_context = None
         self.continue_time = None
+        self.continue_args = None
+        g_id = None
 
-    def _cmd_reset_game_data(self) -> None:
-        """
-            [ DOES NOT WORK AT THE MOMENT ]
-            Requires connection.
-            Deletes the stored game data for the currently loaded slot.
-            Running this command will destroy your safe file.
+        if slot_name == "" or seed == "":
+            g_id = self.ctx.game_id
+            if g_id is None:
+                logger.info("Please provide the name and seed parameters,"
+                            "or use this command while the client is connected."
+                )
+                return
+        else:
+            g_id = get_game_id(slot_name, seed)
 
-            This operation is irreversible and can cause data loss, make sure you know what you're doing.
-        """
-        # Check if the slot is connected.
-        self.continue_context = "reset"
-        self.continue_time = time.perf_counter()
-        logger.info("This operation is irreversible and can cause data loss.")
-        logger.info("Send /confirm in order to reset your game data.")
+        has_data = KhimeraDAMGStorageHandler.probe_data(g_id)
+        if not has_data:
+            logger.info("No data found for this slot.")
+            return
 
-    def _cmd_wipe_all_game_data(self) -> None:
-        """
-            [ DOES NOT WORK AT THE MOMENT ]
-            Deletes all the stored game data.
-            Running this command will destroy every save file you have in your computer.
-
-            This operation is irreversible, make sure you know what you're doing.
-        """
-        self.continue_context = "wipe"
-        self.continue_time = time.perf_counter()
-        logger.info("This operation is irreversible.")
-        logger.info("Send /confirm in order to wipe the game data.")
-
-    def _cmd_wipe_all_but_current(self) -> None:
-        """
-            [ DOES NOT WORK AT THE MOMENT ]
-            Requires connection.
-            Deletes all the stored game data, except for the current slot.
-            Running this command will destroy every other save file you have in your computer.
-
-            This operation is irreversible, make sure you know what you're doing.
-        """
-        # Check if the slot is connected.
-        self.continue_context = "wipe"
-        self.continue_time = time.perf_counter()
-        logger.info("This operation is irreversible.")
-        logger.info("Send /confirm in order to wipe the game data.")
+        async def exporter(g_id: str, command_processor: KhimeraDAMGCommandProcessor) -> None:
+            try:
+                result = await KhimeraDAMGStorageHandler.save_data(g_id)
+                if result:
+                    logger.info("Exported game data successfully.")
+                else:
+                    logger.warning("Failed to export game data.")
+            except Exception:
+                logger.warning("Failed to export game data.")
+            finally:
+                command_processor.command_running = False
+        Utils.async_start(exporter(g_id, self))
+        self.command_running = True
+        logger.info("Opening the file explorer...")
 
     def _cmd_import_game_data(self) -> None:
         """
-            [ DOES NOT WORK AT THE MOMENT ]
-            Requires connection.
             Loads and exported copy of the game data for the currently loaded slot.
             Note that this requires the exported data's slot to match the currently loaded one.
 
             This operation is irreversible and can cause data loss, make sure you know what you're doing.
         """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+
+        async def importer(command_processor: KhimeraDAMGCommandProcessor) -> None:
+            file_name = await asyncio.to_thread(
+                Utils.open_filename,
+                "Import game data",
+                [("Khimera DAMG data", [".kdamgdata"])]
+            )
+            game_id = KhimeraDAMGStorageHandler.probe_load(file_name)
+            if game_id is None:
+                logger.warning("Failed to import game data.")
+                return
+            if game_id == "":
+                if KhimeraDAMGStorageHandler.load_data(file_name):
+                    logger.info("Imported game data successfully.")
+                else:
+                    logger.warning("Failed to import game data.")
+                return
+            if self.ctx.game_id is not None and self.ctx.game_id == game_id:
+                logger.warning("Cannot import data to the currently loaded slot. Close the game and try again.")
+                return
+
+            logger.info("There already is a data file for the loaded slot; would you like to overwrite it?"
+                        "This operation is irreversible"
+            )
+            logger.info("Send /confirm in order to import your game data.")
+            command_processor.continue_context = "import"
+            command_processor.continue_time = time.perf_counter()
+            command_processor.continue_args = {"file_name": file_name}
+            command_processor.command_running = False
+
+        Utils.async_start(importer(self))
+        self.command_running = True
+
+    def _cmd_reset_game_data(self, seed: str = "", slot_name: str = "") -> None:
+        """
+            Deletes the stored game data for a slot.
+            Running this command will destroy your safe file.
+
+            :param seed: The seed of the hosted game.
+            :param slot_name: The name of your slot. Use quotes if the name contains spaces.
+            This operation is irreversible and can cause data loss, make sure you know what you're doing.
+        """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+
+        if slot_name == "" or seed == "":
+            logger.info("Please provide the name and seed parameters.")
+            return
+
+        g_id = get_game_id(slot_name, seed)
+        if self.ctx.game_id == g_id:
+            # Not exactly the correct condition to enter here, but it will work while we don't have a launcher
+            logger.info("You cannot reset the currently loaded game data. Close the game and try again.")
+            return
+
+        has_data = KhimeraDAMGStorageHandler.probe_data(g_id)
+        if not has_data:
+            logger.info("No data found for this slot.")
+            return
+
         # Check if the slot is connected.
-        self.continue_context = "import"
+        self.continue_context = "reset"
         self.continue_time = time.perf_counter()
+        self.continue_args = {"g_id": g_id}
         logger.info("This operation is irreversible and can cause data loss.")
-        logger.info("Send /confirm in order to import your game data.")
+        logger.info("Send /confirm in order to reset your game data.")
+
+    def _cmd_wipe_all_game_data(self) -> None:
+        """
+            Deletes all the stored game data.
+            Running this command will destroy every save file, except for the currently loaded data.
+
+            This operation is irreversible, make sure you know what you're doing.
+        """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+        g_id = self.ctx.game_id
+
+        self.continue_context = "wipe"
+        self.continue_args = {"g_id": g_id}
+        self.continue_time = time.perf_counter()
+
+        logger.info("Would you like to delete all game data? This operation is irreversible.")
+        if g_id is not None:
+            logger.info("Note: This will not delete the currently loaded game data.")
+        logger.info("Send /confirm in order to wipe the game data.")
+
+    def _cmd_launch(self) -> None:
+        """ WIP """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+        pass
+
+    def _cmd_close_game(self) -> None:
+        """ WIP """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+        pass
 
     def _cmd_confirm(self) -> None:
         """
             Confirmation command, does nothing on its own.
             Once a dangerous command is issued, you will be asked to use this.
         """
+        if self.command_running:
+            logger.warning("Theres a command being currently executed.")
+            return
         if self.continue_context is None or self.continue_time is None:
             logger.info("Nothing to confirm.")
             return
@@ -145,128 +270,63 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             logger.info("You took too long to confirm, please try again.")
             self.continue_time = None
             self.continue_context = None
+            self.continue_args = None
             return
         if self.continue_context == "wipe":
             self.continue_context = "wipe_"
             self.continue_time = time.perf_counter()
-            logger.info("This will delete every single saved file in your machine."
+            has_gid = None
+            if self.continue_args is not None:
+                has_gid = self.continue_args.get("g_id")
+            logger.info("This will delete all *archipelago related*"
+                        "Khimera: Destroy All Monster Girls game data file in your machine."
                         " Are you absolutely sure this is what you want to do?")
+            if has_gid:
+                logger.info("Note: This will not delete the currently loaded game data.")
             logger.info("Send /confirm again in order to wipe the game data. (LAST WARNING)")
             return
         if self.continue_context == "wipe_":
             # Wipe everything.
+            g_id = None if self.continue_args is None else self.continue_args.get("g_id")
+            KhimeraDAMGStorageHandler.wipe(g_id)
+            if g_id is None:
+                logger.info("All game data has been deleted.")
+            else:
+                logger.info("All game data (except the currently loaded) has been deleted.")
             self.continue_context = None
             self.continue_time = None
-            return
-        if self.continue_context == "wipe_but":
-            self.continue_context = "wipe_but_"
-            self.continue_time = time.perf_counter()
-            logger.info("This will delete every single saved file in your machine other than the currently loaded one."
-                " Are you absolutely sure this is what you want to do?")
-            logger.info("Send /confirm again in order to wipe all game data other than the currently loaded."
-                "(LAST WARNING)")
-            return
-        if self.continue_context == "wipe_but_":
-            # Wipe everything, but the current slot.
-            self.continue_context = None
-            self.continue_time = None
+            self.continue_args = None
             return
         if self.continue_context == "reset":
-            # Deletes the current slot's storage yaml
-            self.continue_time = None
+            if self.continue_args is None or "g_id" not in self.continue_args:
+                logger.warning("Error: Attempt to execute a reset action without defining import arguments"
+                               "(This is the dev's fault, please notify them)"
+                )
+                return
+            g_id = self.continue_args["g_id"]
+            if KhimeraDAMGStorageHandler.delete_data(g_id):
+                logger.info("Deleted game data successfully.")
+            else:
+                logger.warning("Failed to delete game data.")
             self.continue_context = None
+            self.continue_time = None
+            self.continue_args = None
             return
         if self.continue_context == "import":
-            _imp_path = Path()  # Import path
-            # check if is yaml
-            # get slot information (name and seed).
-            # verify if they match with the current context
-            # find a way to swap the
+            if self.continue_args is None or "file_name" not in self.continue_args:
+                logger.warning("Error: Attempt to execute an import action without defining import arguments"
+                               "(This is the dev's fault, please notify them)"
+                )
+                return
+            file_name = self.continue_args["file_name"]
+            if KhimeraDAMGStorageHandler.load_data(file_name):
+                logger.info("Imported game data successfully.")
+            else:
+                logger.warning("Failed to import game data.")
             self.continue_time = None
             self.continue_context = None
+            self.continue_args = None
             return
-
-
-class KhimeraDAMGStorageHandler:
-    @staticmethod
-    def _get_path(game_id: str) -> Path:
-        path = Path(Utils.user_path(GAME_ID))
-        if not path.exists():
-            path.mkdir(parents=True)
-        # No benefit from hashing this other than obfuscation, bad for testing.
-        file_name = f"{game_id}.yaml"
-        return path / file_name
-
-    @classmethod
-    def _get_data(cls, game_id: str) -> Any:
-        path = cls._get_path(game_id)
-        if not path.exists():
-            return {}
-        data = yaml.safe_load(path.read_text())
-        # We do not want lists here, so, just to be safe, let's drop the data if it is a list.
-        if not isinstance(data, dict):
-            data = {}
-        return data
-
-    @classmethod
-    def _set_data(cls, data: Any, game_id: str) -> None:
-        base = cls._get_path(game_id)
-        tmp = base.parent / (base.name + ".tmp")
-        tmp.write_text(yaml.dump(data))
-        os.replace(tmp, base)
-
-    @classmethod
-    def store(cls, key: str, value: Any, game_id: str, category: str | None = None) -> None:
-        """Value has to be yaml-able."""
-        data: dict = cls._get_data(game_id)
-        if category is None:
-            if value is None:
-                data.pop(key, "")
-            else:
-                data[key] = value
-        else:
-            cat_data = data.get(category)
-            if cat_data is None:
-                cat_data = {}
-            if value is None:
-                cat_data.pop(key, "")
-            else:
-                cat_data[key] = value
-            data[category] = cat_data
-        cls._set_data(data, game_id)
-
-    @classmethod
-    def store_many(cls, keys: list[str], values: list[Any], game_id: str, category: str | None = None) -> None:
-        data: dict = cls._get_data(game_id)
-        if not len(keys) == len(values):
-            raise ValueError("Keys and values must have the same number of elements")
-        for i in range(len(keys)):
-            if category is None:
-                if values[i] is None:
-                    data.pop(keys[i], "")
-                else:
-                    data[keys[i]] = values[i]
-            else:
-                cat_data = data.get(category)
-                if cat_data is None:
-                    cat_data = {}
-                if values[i] is None:
-                    cat_data.pop(keys[i], "")
-                else:
-                    cat_data[keys[i]] = values[i]
-                data[category] = cat_data
-        cls._set_data(data, game_id)
-
-    # Allows getting a whole category by passing its name as a key.
-    @classmethod
-    def get(cls, key: str, game_id: str, default: Any = None, category: str | None = None) -> Any:
-        data: dict = cls._get_data(game_id)
-        if category is None:
-            return data[key] if key in data else default
-        if category in data:
-            cat_data = data[category]
-            return cat_data[key] if key in cat_data else default
-        return default
 
 
 class KhimeraDAMGConnectionState:
@@ -559,7 +619,7 @@ class KhimeraDAMGContext(CommonContext):
         is_win = win_status == ClientStatus.CLIENT_GOAL
         # This will return the entirety of the "game_data" category.
         game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {})  # type: ignore
-        cctx = ConnectionContext(
+        return ConnectionContext(
             ap_version=Utils.__version__,
             host_world_version=self.host_world_version,  # type: ignore
             client_world_version=APWORLD_VERSION,
@@ -573,7 +633,6 @@ class KhimeraDAMGContext(CommonContext):
             item_list=item_list,
             has_goaled=is_win
         )
-        return cctx
 
     async def _start_up_game_processes(self) -> None:
         last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0)  # type: ignore

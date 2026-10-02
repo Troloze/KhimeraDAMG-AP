@@ -1,4 +1,4 @@
-
+# Replace if needed
 $APCustomWorldDir = "C:/ProgramData/Archipelago/custom_worlds"
 
 $Root = Split-Path $PSScriptRoot -Parent

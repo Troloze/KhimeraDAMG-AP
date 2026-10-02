@@ -128,7 +128,7 @@ class AgentV1(CommunicationAgent):
 
         self.communication_opened = True
 
-    def reconnect(self, connection_context: ConnectionContext):
+    def reconnect(self, connection_context: ConnectionContext) -> None:
         with self.context_lock:
             self.connection_context = connection_context
 
@@ -158,7 +158,7 @@ class AgentV1(CommunicationAgent):
         self.time_since_last_heartbeat_update: float = -1
         self._test_sandbox_access()  # Needs to be on init so game status update can be detected.
         self.thread_exit = threading.Event()
-        self.context_lock:threading.Lock = threading.Lock()
+        self.context_lock: threading.Lock = threading.Lock()
 
     def _on_start(self) -> None:
         for file in self._cleanup_target_files:
@@ -538,14 +538,14 @@ class AgentV1(CommunicationAgent):
         if (
             death_data is not None and
             isinstance(death_data, dict) and
-            isinstance(death_data.get("id"), int) and
+            isinstance(death_data.get("id"), (int, float)) and
             isinstance(death_data.get("message"), str)
         ):
             # We receive a structure, not the built message,
             # so we have to insert the slot name here.
-            
+
             dl_msg: str = death_data.get("message", "").replace("%s", context_copy.slot_name)
-            death_link = (context_copy.slot_name, death_data["id"], dl_msg)
+            death_link = (context_copy.slot_name, int(death_data["id"]), dl_msg)
         location_acks: set[int] | None = set(l_ids) if (l_ids := message.get("location_acks")) is not None else None
         death_ack: int | None = message.get("death_ack")
         _exit_code: int | None = game_information.get("exit_code")  # Currently does nothing
@@ -568,11 +568,11 @@ class AgentV1(CommunicationAgent):
                     if (
                         death_data_ is not None and
                         isinstance(death_data_, dict) and
-                        isinstance(death_data_.get("id"), int) and
+                        isinstance(death_data_.get("id"), (int, float)) and
                         isinstance(death_data_.get("message"), str)
                     ):
                         dl_msg_: str = death_data_.get("message", "").replace("%s", context_copy.slot_name)
-                        death_link = (context_copy.slot_name, death_data_["id"], dl_msg_)
+                        death_link = (context_copy.slot_name, int(death_data_["id"]), dl_msg_)
                 location_acks_: set[int] | None = \
                     set(l_ids) if (l_ids := message_.get("location_acks")) is not None else None
                 if location_acks_ is not None:

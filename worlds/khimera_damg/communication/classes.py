@@ -62,7 +62,7 @@ class CommunicationAgent(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def reconnect(self, connection_context: ConnectionContext):
+    def reconnect(self, connection_context: ConnectionContext) -> None:
         pass
 
     @abstractmethod

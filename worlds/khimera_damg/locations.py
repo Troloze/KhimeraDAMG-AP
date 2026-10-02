@@ -69,6 +69,9 @@ minibosses: LocList = [
     _make_loc(StageIndex.MT_AFROKUPA, LocType.MINIBOSS, 1, "Versus Wednesday"),
     _make_loc(StageIndex.PUMPKIN_VALLEY, LocType.MINIBOSS, 1, "Versus Tuesday"),
     _make_loc(StageIndex.OIL_PLATFORM, LocType.MINIBOSS, 1, "Versus Thursday"),
+
+    _make_loc(StageIndex.WINDY_WAY, LocType.MINIBOSS, 1, "Versus Random Witch"),
+
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 1, "Versus Monday & Tuesday"),
     _make_loc(StageIndex.THE_BLACK_WIDOW, LocType.MINIBOSS, 2, "Versus Wednesday & Thursday"),
 
