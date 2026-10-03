@@ -12,7 +12,7 @@ from .locations import apply_goal_logic, apply_location_rules, loc_table
 from .regions import create_regions
 from .types import KhimeraDAMGItem, StageIndex
 
-APWORLD_VERSION: str = "0.0.2"
+APWORLD_VERSION: str = "0.0.9"
 GAME_ID: str = "khimera_damg"
 
 

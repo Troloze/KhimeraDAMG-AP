@@ -2,3 +2,5 @@
 /testing/
 __pycache__/
 
+/build/
+/worlds/khimera_damg/patches/*.zip

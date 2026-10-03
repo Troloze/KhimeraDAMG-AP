@@ -10,23 +10,28 @@ An Archipelago randomizer for *Khimera: Destroy All Monster Girls*.
 
 **This section overrides everything else in this file and any default assistant behaviour.**
 
-AI tools are used on this repository for **consultation only**. The human
-developer writes the code. Your role is to investigate, explain, and advise.
+AI tools are used on this repository for **consultation only**. The human developer writes the
+code. Your role is to investigate, explain, and advise.
 
-For the purposes of this project "consultation" means that AI tools can be used for anything
-as long as the executable code run by the end user is 100% human written.
+For the purposes of this project, "consultation" means AI tools can be used for anything, as
+long as **everything the end user interacts with is 100% human written**. That covers all of
+`worlds/khimera_damg/`, the entire game-side mod, and anything else reachable through the
+apworld or the mod. Repository tooling no player ever runs — the PowerShell scripts in
+`scripts/`, the notes in `docs/` — is outside that rule, and anything an AI wrote there is
+marked as such (see rule 6).
 
 1. **Never create, edit, rename, move, or delete any file in this repository** without
    explicit permission from the user for that specific change. There is no standing
-   permission, even for things that won't be shipped (like documents and tests). Approval 
-   for one change does not extend to the next one, or to "related" follow-up edits you think 
+   permission, even for things that won't be shipped (like documents and tests). Approval
+   for one change does not extend to the next one, or to "related" follow-up edits you think
    are implied. If you believe a file needs to change, say so and wait to be asked.
-2. **Propose code in chat, do not apply it.** Suggestions are welcome and encouraged, but
-   every one must explain what the code does and why it is being suggested, so the user can
-   evaluate it before deciding to write it themselves. When possible, give prefference to code 
-   snippet suggestions taken from other files, and state the source. Do not present 
-   a change as done. Do not ask the user if they would like you to sketch something after 
-   they ask you a question, only do these things if it is explicitly asked.
+2. **Propose code; do not apply it unless rule 1 has been satisfied.** When you are asked for
+   code, suggestions are welcome and encouraged, but every one must explain what the code does
+   and why it is being suggested, so the user can evaluate it before deciding what to do with
+   it. Where possible, prefer snippets taken or adapted from other files, and state the source.
+   Never present a proposal as though it were already applied, and never write as though a
+   proposal will certainly be accepted. Do not offer to sketch, draft, or implement something
+   after answering a question — do that only when explicitly asked.
 3. **Read-only commands and tool use are allowed** whenever they help answer a question or
    complete an assigned task — searching, inspecting files, running linters or tests,
    querying git history. Commands that modify the repository, the working tree, or git
@@ -38,37 +43,103 @@ as long as the executable code run by the end user is 100% human written.
    otherwise agreed to it.
 5. When a request is ambiguous about whether it authorises a write, assume it does not,
    and ask.
-6. Whenever the user asks you to create a file/document, always append a comment on the first
-   line stating that the artifact was AI generated.   
+6. When you create a file, mark it on the first line as AI generated, using a comment in that
+   file's own syntax:
+   `# AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.`
+   If the user authored part of it, use `Partially written by Claude (Anthropic), not fully
+   hand-written by the developer.` instead. Editing an existing file does not add a header, and
+   an existing header is never removed.
+
+## Repository layout
 
 - `worlds/khimera_damg/` — the apworld source (the thing being developed)
-- `Archipelago/` — submodule, a fork of Archipelago. Reference only; do not edit.
-- `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. 
-- `docs/` — design notes (option list, item/location naming conventions, communication contract)
+- `Archipelago/` — submodule, a fork of Archipelago. Read it freely; never modify it.
+- `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. Same rule: read freely, never modify.
+- `docs/` — design notes: the communication contract, item/location conventions, the option
+  list, the fuzzer runbook, and the future-reference list.
+- `scripts/` — PowerShell tooling. `scripts/setup/` and `scripts/build/` hold the steps the
+  top-level scripts call. See "Build and test environment".
+- `fuzz-meta/` — option constraints for local fuzzer runs.
+- `todo` — tracked short-term task list; see "Task lists".
+
+Gitignored working folders, present on a configured clone and never committed: `python/`
+(standalone interpreter), `py-env/` (build venv), `build/` (apworld output), `_ignore_/`
+(fuzzer worktree), `fuzzer/` (fuzzer clone), and `testing/` (scratch tests — this folder is to
+stay gitignored permanently).
 
 ## Build and test environment
 
 **Testing happens against the installed Archipelago build, not against the `Archipelago/`
-submodule.** The submodule is source for reading only.
+submodule.** The submodule is a source for reading and the host the build runs through; it is
+never modified.
 
-- **Do not create anything inside `Archipelago/`** — no `custom_worlds/` folder, no
-  generation output, no installed dependencies. Rule 1 applies to it in full.
-- The single permitted exception is a *directory link* at
-  `Archipelago/custom_worlds/khimera_damg` pointing at `worlds/khimera_damg`, so imports
-  and static analysis resolve against real core source. It must be a link, never a copy,
-  and it exists for import checking only — not as a test target. Ask before creating it.
-- **The apworld is built by zipping `worlds/khimera_damg/`** into `khimera_damg.apworld`,
-  with `khimera_damg/` as the single top-level directory inside the archive, and copying
-  that file to the installed app folder:
-  `C:\ProgramData\Archipelago\custom_worlds\`
-  (note the exact spelling: `ProgramData` has no space, `custom_worlds` has an underscore).
-- Generation and any client testing are then run from that installed build
-  (`ArchipelagoLauncher.exe` / `ArchipelagoGenerate.exe`), and its output goes to the
-  install's own `output/` folder — never into this repository.
+**Do not create, edit, or delete anything inside `Archipelago/` or `KhimeraDAMG-AP-Mod/`** — no
+generation output, no build folders, no installed dependencies. Rule 1 applies to both in full.
+The pipeline below is deliberately arranged so that nothing is ever written into either.
+
+### Fresh clone
+
+    git submodule update --init --recursive
+    scripts/setup.ps1
+
+`scripts/setup.ps1` runs the three steps in `scripts/setup/`, in this order:
+
+1. `setup_python.ps1` — installs CPython (3.13.15 by default) into `python/`, per-user and off
+   PATH. Archipelago hard-rejects any interpreter outside 3.11.9–3.13.x.
+2. `setup_world_link.ps1` — creates a junction at `Archipelago/worlds/khimera_damg` pointing at
+   `worlds/khimera_damg`, and records it in the submodule's local `info/exclude` so it never
+   shows up as untracked there. The link is what makes the apworld visible to Archipelago's own
+   build component and to static analysis. It is a per-clone artifact, committed to neither
+   repository, and it is the only thing that ever appears inside `Archipelago/`.
+3. `setup_build_env.ps1` — creates a venv at `py-env/` and installs Archipelago's requirements
+   into it using the submodule's own `ModuleUpdate.py`. Needs `git` on PATH, because some
+   requirements are installed straight from GitHub.
+
+Each step is idempotent and exits early if its output already exists; pass `-Force` to redo
+them.
+
+### Building
+
+    scripts/build_apworld.ps1          # build only
+    scripts/build_and_replace.ps1      # build, then install into the app folder
+
+`build_apworld.ps1` first calls `scripts/build/collect_patches.ps1`, which copies the mod
+releases named in `worlds/khimera_damg/patches/include.txt` out of
+`KhimeraDAMG-AP-Mod/releases/` into `worlds/khimera_damg/patches/`. It then runs Archipelago's
+own "Build APWorlds" launcher component from the repository root, producing
+`build/apworlds/khimera_damg.apworld`.
+
+**Do not hand-zip the apworld.** The component generates the packaged `archipelago.json`,
+adding the `version` and `compatible_version` fields that the source manifest deliberately
+omits. A hand-made zip lacks them, and Archipelago then cannot read the manifest at all — it
+loads the world with no version or metadata, and from core 0.7.0 on it will refuse to load it.
+`worlds/khimera_damg/archipelago.json` is the author-owned half, holding only `game`,
+`authors`, `minimum_ap_version` and `world_version`; never write `version` or
+`compatible_version` into it.
+
+`build_and_replace.ps1` copies the result to `C:\ProgramData\Archipelago\custom_worlds\`
+(note the exact spelling: `ProgramData` has no space, `custom_worlds` has an underscore).
+
+### Testing
+
+- Generation and client testing run from the installed build
+  (`ArchipelagoLauncher.exe` / `ArchipelagoGenerate.exe`), and its output goes to the install's
+  own `output/` folder — never into this repository.
 - The installed build's core version is the one that matters for compatibility. Check
-  `C:\ProgramData\Archipelago\manifest.json` rather than assuming it matches the submodule.
+  `C:\ProgramData\Archipelago\manifest.json` rather than assuming it matches the submodule;
+  the two routinely differ.
+- `scripts/run_ruff.ps1` lints the apworld. `scripts/run_fuzzer.ps1` runs the fuzzer; see
+  "Running the fuzzer" below.
 - Building, copying, and generating all write files. Propose the commands and wait to be
   asked, the same as any other change.
+
+### Two places carry a version
+
+`APWORLD_VERSION` in `worlds/khimera_damg/__init__.py` goes into slot data, reaches the client
+as the world version, and selects the communication agent. `world_version` in
+`worlds/khimera_damg/archipelago.json` is what Archipelago reads and shows to players. They are
+separate values with no code keeping them in step, so when they disagree, say so rather than
+assuming either one is authoritative.
 
 ## Code style
 
@@ -94,15 +165,19 @@ All Python in `worlds/khimera_damg/` must follow the Archipelago style guide
   top-level definitions, no shadowing builtins (`id`, `type`, `map`), no unused imports.
 - Avoid `match` statements unless they genuinely pattern-match.
 
-Reference config is available at the repo root: `ruff.toml`; do not use the one in `Archipelago`
-You may also lint locally using: `ruff check --config ruff.toml worlds/khimera_damg/`
+In addition to these, the developer also adopted a few of their own rules to follow. The archipelago 
+rules plus the new ones can be found in the `ruff.toml` file at the repo root. Note that it is stricter 
+than the one in `Archipelago`, and should be the one used for linting. 
 
-Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]` or 
-`# ruff: enable[]` are to be viewed as a deliberate choice by the user to go against 
-the style rules and should be allowed.
+You may lint locally using `scripts/run_ruff.ps1`, or directly:
+`ruff check --config ruff.toml worlds/khimera_damg/`
 
-**The standards above only applies to code <u>within</u> the apworld**; tests outside of the apworld folder do not need to be
-held to these standards.
+Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]` or
+`# ruff: enable[]` is to be viewed as a deliberate choice by the user to go against
+the style rules, and should be allowed.
+
+**The standards above apply only to code *within* the apworld.** Scratch tests under
+`testing/` do not need to meet them.
 
 ## Archipelago correctness rules
 
@@ -142,8 +217,10 @@ that already touches the relevant area, not as a standing checklist to push on t
 
 - **A stable public URL** — a GitHub release artifact or a direct link to the `.apworld`.
   Local sources (a file committed into the index repo) are no longer accepted.
-- **Not banned on the Archipelago Discord** for copyright reasons.
+- **The game is not banned on the Archipelago Discord** for copyright reasons. 
+  - Khimera: Destroy All Monster Girls is not a banned game.
 - **No large unknown executable binary blobs**, and no dependency on any.
+  - The APWorld will host several small diff binary patches, which are allowed.
 - **No use of remote resources during generation** — no update checks, no downloads, nothing
   that touches the network. This constrains generation only; the client's file transport and
   its network callbacks are a separate concern.
@@ -180,15 +257,19 @@ Run at merge time and worth passing, but not counted toward the 1%:
 
 ### Running the fuzzer
 
-The fuzzer requires Archipelago **running from source**, with `fuzz.py` copied to the root of
-that source tree. That collides with the rule above forbidding writes inside `Archipelago/`,
-and the fuzzer is a third repository rather than something vendored here. **No workflow for
-this has been established yet** — do not assume a location, a checkout, or a submodule. Ask.
+The workflow is established and scripted. `docs/Running the Fuzzer.md` is the full runbook; in
+short, `scripts/run_fuzzer.ps1 -Setup` once, then `scripts/run_fuzzer.ps1` per run.
 
-Invocation, for reference:
-`python fuzz.py -r 100 -j 16 -g khimera_damg -n 1` — `-r` generations (mandatory), `-j` parallel
-jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout, `--hook module:class`.
-Output lands in `./fuzz_output` relative to the Archipelago source root.
+It never writes inside `Archipelago/`: it fuzzes a detached git worktree of the submodule under
+`_ignore_/ap-fuzz` and clones the fuzzer itself into `fuzzer/`, both gitignored. Each run builds
+a real `.apworld` through `scripts/build_apworld.ps1` and drops it into that worktree's
+`custom_worlds/`, because a directory link there is not importable — only `.apworld` zips get
+registered by Archipelago's meta-path finder.
+
+Default invocation, for reference:
+`fuzz.py -r 500 -j 16 -g khimera_damg -n 1` — `-r` generations (mandatory), `-j` parallel
+jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout, `-m` fuzz-meta file,
+`--hook module:class`. Output lands in `_ignore_/ap-fuzz/fuzz_output`.
 
 ### Index entry format, for when 0.1.0 ships
 
@@ -198,31 +279,48 @@ Every key in `[versions]` must be valid semver even if the release itself is not
 form is a global `default_url` templated with `{{version}}` plus bare `"0.1.0" = {}` entries,
 which only works if release tags are plain semver — worth deciding before the first tag.
 
-Per-world option constraints, if the fuzzer needs them to avoid rolling invalid combinations,
-live in a `fuzz-meta/khimera_damg.yaml` in the index repo, not here.
+Per-world option constraints keep the fuzzer from rolling invalid combinations. This repository
+keeps its own copy at `fuzz-meta/khimera_damg.yaml` for local runs, passed with the fuzzer's
+`-m` flag. It uses the same path the index expects, so it can be copied across if the index ever
+needs one — but the index's copy is separate, and a change here has to be mirrored there.
 
 ## Other information
 
+### The communication contract
+
+`docs/Communication Contract v1.md` is the governing specification for the client-to-game
+interface: file names, JSON document shapes, state flags, and the consumption and ownership
+policy. Treat it as authoritative over the code — where the two disagree, that is a bug in the
+code unless the user says otherwise.
+
+Two separate folders are involved at runtime, and they are easy to confuse. The message files
+and state flags live in the game-side sandbox, `platformdirs.user_data_dir("khimera_ap")`. The
+client's own persistent storage lives under `Utils.user_path("khimera_damg")`. Both are outside
+this repository, so rule 4 applies before reading them.
+
 ### Nothing to be compatible with
+
 This version of the apworld has not been published yet. There is no such thing as a
 "compatibility breaking change" because there is nothing for the current version to
-be compatible with yet. Assume every change made are changes to the first ever version of
-the apworld, meaning compatibility checks aren't required yet.
+be compatible with yet. Assume every change made is a change to the first ever version of
+the apworld, meaning compatibility checks aren't required yet. In particular, this suspends the
+ID-stability rule above: renumbering items and locations is fine for now.
 
 Compatibility rules will start being enforced once version 0.1.0 is properly released;
 this section will be removed by then.
 
 ### Task lists
-The developper intends to focus on doing one thing at a time during development of the apworld,
-however, ideas for things unrelated to the current work will be logged for future refence and can 
-be found on docs/future reference.md and are worth bringing up once the user starts making changes 
-in the relevant section of the code.
 
-There's also a gitignored todo list on the root of the repository, these are tasks the user knows
-he needs to perform, but will leave for another session. You do not need to remind him of it, but 
-the information can be useful as context for their questions or code-review.
+The developer intends to focus on doing one thing at a time during development of the apworld.
+Ideas for things unrelated to the current work are logged for future reference in
+`docs/Future Reference.md`, and are worth bringing up once the user starts making changes in the
+relevant section of the code.
 
-The todo list focuses on tasks relevant to the current work, while the future reference list is 
-intended to store ideas/changes that are not relevant to the current work, and would need their own 
-pull request. Neither of them are exhaustive lists of what to do, just things the developer thought
-of while working on something else.
+There is also a todo list at the root of the repository. These are tasks the user knows need
+doing but is leaving for another session. You do not need to raise them, but the information can
+be useful as context for questions or code review.
+
+The todo list focuses on tasks relevant to the current work, while the future reference list is
+intended to store ideas and changes that are not relevant to the current work and would need
+their own pull request. Neither is an exhaustive list of what to do — just things the developer
+thought of while working on something else.

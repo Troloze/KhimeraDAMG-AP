@@ -5,7 +5,7 @@ param(
     [switch] $Force
 )
 
-$Root = Split-Path $PSScriptRoot -Parent
+$Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $PythonDir = Join-Path $Root "python"
 $PythonExe = Join-Path $PythonDir "python.exe"
 
