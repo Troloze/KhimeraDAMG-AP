@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-# ruff: disable[RUF001]
+# ruff: disable[ambiguous-unicode-character-string]
 string_normalization_table = str.maketrans({
     "´": "'",
     "`": "'",
@@ -54,7 +54,7 @@ string_normalization_table = str.maketrans({
 })
 
 
-# ruff: enable[RUF001]
+# ruff: enable[ambiguous-unicode-character-string]
 
 # Cleans up a string, transforms to ascii and replaces unknown characters with a string.
 def normalize_and_sanitize(entry: str, unknown_replacement: str = "_") -> str:

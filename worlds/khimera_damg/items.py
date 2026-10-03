@@ -25,7 +25,7 @@ def make_item_id(item_type: ItemType, index: int) -> int:
     return (5000 + item_type.value) * 100000 + index
 
 
-# ruff: disable[E501]
+# ruff: disable[line-too-long]
 upgrades: ItemDict = {
     "Harpy Boost":      ItemData(make_item_id(ItemType.SKILLS, 1), ItemClassification.useful),
     "Saucy Shot":       ItemData(make_item_id(ItemType.SKILLS, 2), ItemClassification.useful),
@@ -176,7 +176,7 @@ item_table = {
     **traps
 }
 
-# ruff: enable[E501]
+# ruff: enable[line-too-long]
 
 
 def update_item_classification(world: "KhimeraDAMGWorld") -> None:

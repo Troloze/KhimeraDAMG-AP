@@ -92,7 +92,7 @@ def create_and_connect_region(
 
     extra_stages = [StageIndex.ICY_PATH, StageIndex.BRINE_CAVE, StageIndex.TOWER_OF_POWER, StageIndex.WINDY_WAY]
     func: CollectionRule | None
-    # ruff: disable[E731]
+    # ruff: disable[lambda-assignment]
     if stage_lock is None:
         func = None
     elif stage_lock in extra_stages:
@@ -155,7 +155,7 @@ def create_and_connect_region(
         )
     else:
         func = lambda state: state.has(stage_entrances[stage_lock], world.player)
-    # ruff: enable[E731]
+    # ruff: enable[lambda-assignment]
     connected_region.connect(new_region, entrance_name, rule=func)
 
     return new_region
