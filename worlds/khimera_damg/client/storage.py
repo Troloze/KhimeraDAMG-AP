@@ -6,21 +6,30 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import Utils
+import Utils  # type: ignore
 import yaml
 
-from . import GAME_ID
+from .. import GAME_ID
 
 
 class KhimeraDAMGStorageHandler:
     @staticmethod
     def _get_path(game_id: str, folder: str | None) -> Path:
-        path = Path(Utils.user_path(GAME_ID)) 
-        if folder is not None:
+        path = Path(Utils.user_path(GAME_ID))
+        if folder is not None and folder != "":
             path /= folder
         if not path.exists():
             path.mkdir(parents=True)
         file_name = f"{game_id}.yaml"
+        return path / file_name
+
+    @staticmethod
+    def get_path_raw(file_name: str, folder: str | None = None) -> Path:
+        path = Path(Utils.user_path(GAME_ID))
+        if folder is not None and folder != "":
+            path /= folder
+        if not path.exists():
+            path.mkdir(parents=True)
         return path / file_name
 
     @classmethod
@@ -90,7 +99,7 @@ class KhimeraDAMGStorageHandler:
         if file_name is None:
             return None
         game_id: str | None = None
-        with open(file_name, "r", encoding="utf-8") as f:
+        with open(file_name, "r", encoding="utf-8-sig") as f:
             try:
                 data: dict = yaml.safe_load(f.read())
                 game_id = data["id"]
@@ -107,7 +116,7 @@ class KhimeraDAMGStorageHandler:
         if file_name is None:
             return False
         game_id: str | None = None
-        with open(file_name, "r", encoding="utf-8") as f:
+        with open(file_name, "r", encoding="utf-8-sig") as f:
             try:
                 data: dict = yaml.safe_load(f.read())
                 game_id = data["id"]
@@ -140,7 +149,7 @@ class KhimeraDAMGStorageHandler:
         game_id: str,
         category: str | None = None,
         *,
-        folder: str = "game_data"
+        folder: str | None = "game_data"
     ) -> None:
         """Value has to be yaml-able."""
         data: dict = cls._get_data(game_id, folder)
@@ -168,7 +177,7 @@ class KhimeraDAMGStorageHandler:
         game_id: str,
         category: str | None = None,
         *,
-        folder: str = "game_data"
+        folder: str | None = "game_data"
     ) -> None:
         data: dict = cls._get_data(game_id, folder)
         if not len(keys) == len(values):
@@ -199,7 +208,7 @@ class KhimeraDAMGStorageHandler:
         default: Any = None,
         category: str | None = None,
         *,
-        folder: str = "game_data"
+        folder: str | None = "game_data"
     ) -> Any:
         data: dict = cls._get_data(game_id, folder)
         if category is None:
@@ -208,3 +217,20 @@ class KhimeraDAMGStorageHandler:
             cat_data = data[category]
             return cat_data[key] if key in cat_data else default
         return default
+
+    @classmethod
+    def store_as_file(
+        cls,
+        data: bytes | str,
+        file_name: str,
+        *,
+        folder: str | None = None
+    ) -> Path:
+        path = cls.get_path_raw(file_name, folder)
+        if isinstance(data, bytes):
+            with open(path, "wb") as f:
+                f.write(data)
+        elif isinstance(data, str):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(data)
+        return path

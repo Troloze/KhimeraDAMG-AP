@@ -19,11 +19,11 @@ from CommonClient import (  # type: ignore
 )
 from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ignore
 
-from . import APWORLD_VERSION
-from .communication import KhimeraDAMGCommunicationInterface
+from .. import APWORLD_VERSION
+from ..communication import KhimeraDAMGCommunicationInterface
+from ..types import ConnectionContext, LocationInformation, RuntimeInformation
 from .launcher import KhimeraDAMGLauncher
 from .storage import KhimeraDAMGStorageHandler
-from .types import ConnectionContext, LocationInformation, RuntimeInformation
 
 if TYPE_CHECKING:
     import kvui  # type: ignore
@@ -456,6 +456,7 @@ class KhimeraDAMGContext(CommonContext):
     items_handling = 0b111
 
     def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
+
         super().__init__(server_address, password)
         self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher()
         self.slot_data: dict[str, Any] = {}
@@ -573,7 +574,7 @@ class KhimeraDAMGContext(CommonContext):
         game_status = None
         while not self.server_loop_stop_event.is_set():
             start = time.perf_counter()
-            # ruff: disable[PLW0717]
+            # ruff: disable[too-many-statements-in-try-clause]
             try:
                 # Heartbeat probe
                 if game_status is None:
@@ -595,7 +596,7 @@ class KhimeraDAMGContext(CommonContext):
             except Exception as err:
                 logger.exception(f"An exception was raised in server loop: {err}")
             await asyncio.sleep(max(0.0, self.server_loop_cooldown - (time.perf_counter() - start)))
-            # ruff: enable[PLW0717]
+            # ruff: enable[too-many-statements-in-try-clause]
         self.server_loop_stop_event = None
 
     def _get_slot_data(self, args: dict) -> bool:
@@ -675,12 +676,11 @@ class KhimeraDAMGContext(CommonContext):
 
         # Launch game first!
         if not self.launcher.is_game_running:
-            if self.launcher.stored_data_validated:
-                # Prompt user for permission to launch game
-                try:
-                    self.launcher.launch_game(self.host_world_version)  # type: ignore
-                except Exception:
-                    logger.exception("Khimera launch failed; server connection remains active.")
+            # Prompt user for permission to launch game
+            try:
+                self.launcher.launch_game(self.host_world_version)  # type: ignore
+            except Exception:
+                logger.exception("Khimera launch failed; server connection remains active.")
 
         # Wait for win status
         try:
