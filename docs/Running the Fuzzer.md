@@ -39,7 +39,7 @@ cloning so a self-contained `.gitignore` can actually take effect (a nested `.gi
 otherwise make the outer repo treat the whole folder as an opaque untracked entry, invisible
 to any `.gitignore` written inside it).
 
-It finishes by running `scripts/build/build_empty_apworld.ps1`, which sets up the
+It finishes by running `scripts/fuzzer/build_empty_apworld.ps1`, which sets up the
 `empty-apworld` side described at the end of the next section.
 
 ## Every run
@@ -78,7 +78,7 @@ fuzz-meta file once `fuzz-meta/khimera_damg.yaml` has constraints worth applying
 
 `-Setup` also places `empty-apworld` (<https://github.com/ionium-ap/empty-apworld>), the
 100-free-location world the index measures the failure rate with, so there is nothing to do by
-hand. `scripts/build/build_empty_apworld.ps1` clones it into `_ignore_/empty-apworld`, repacks
+hand. `scripts/fuzzer/build_empty_apworld.ps1` clones it into `_ignore_/empty-apworld`, repacks
 it into `_ignore_/ap-fuzz/custom_worlds/empty.apworld`, and writes a one-slot player yaml to
 `_ignore_/ap-fuzz/static_worlds/empty.yaml`. The repack exists for the manifest reason above:
 upstream's `archipelago.json` omits `version` and `compatible_version` just like ours does, so

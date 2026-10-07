@@ -8,7 +8,7 @@ param(
 
 $Root = Split-Path $PSScriptRoot -Parent
 $BuildScript = Join-Path $PSScriptRoot "build_apworld.ps1"
-$EmptyScript = Join-Path $PSScriptRoot "build\build_empty_apworld.ps1"
+$EmptyScript = Join-Path $PSScriptRoot "fuzzer\build_empty_apworld.ps1"
 $BuiltApWorld = Join-Path $Root "build\apworlds\khimera_damg.apworld"
 $FuzzRoot = Join-Path $Root "_ignore_\ap-fuzz"
 $FuzzerRepo = Join-Path $Root "fuzzer"

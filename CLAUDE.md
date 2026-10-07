@@ -57,8 +57,9 @@ marked as such (see rule 6).
 - `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. Same rule: read freely, never modify.
 - `docs/` — design notes: the communication contract, item/location conventions, the option
   list, the fuzzer runbook, and the future-reference list.
-- `scripts/` — PowerShell tooling. `scripts/setup/` and `scripts/build/` hold the steps the
-  top-level scripts call. See "Build and test environment".
+- `scripts/` — PowerShell tooling, plus one Python generator. `scripts/setup/`,
+  `scripts/build/` and `scripts/fuzzer/` hold the steps the top-level scripts call. See
+  "Build and test environment".
 - `fuzz-meta/` — option constraints for local fuzzer runs.
 - `todo` — tracked short-term task list; see "Task lists".
 
@@ -103,11 +104,22 @@ them.
     scripts/build_apworld.ps1          # build only
     scripts/build_and_replace.ps1      # build, then install into the app folder
 
-`build_apworld.ps1` first calls `scripts/build/collect_patches.ps1`, which copies the mod
-releases named in `worlds/khimera_damg/patches/include.txt` out of
-`KhimeraDAMG-AP-Mod/releases/` into `worlds/khimera_damg/patches/`. It then runs Archipelago's
+`build_apworld.ps1` first runs `scripts/build/prepare_patches.py`, which reads the versions
+listed in `worlds/khimera_damg/patches/include.txt`, copies the matching release zips out of
+`KhimeraDAMG-AP-Mod/releases/` into `worlds/khimera_damg/patches/`, and generates
+`worlds/khimera_damg/patches/data.py` from the `kdamg_meta.json` carried inside each zip. That
+module holds the build and patch tables the client's patcher reads. It then runs Archipelago's
 own "Build APWorlds" launcher component from the repository root, producing
 `build/apworlds/khimera_damg.apworld`.
+
+Both the collected zips and `data.py` are gitignored, and `patches/__init__.py` falls back to
+empty tables when `data.py` is absent, so a fresh clone imports before the first build. The
+build component honours only `.apignore`, never `.gitignore`, so both still get packaged into
+the `.apworld`.
+
+`prepare_patches.py` emits code that ships inside the apworld, so it falls under the
+human-written rule above and carries a header saying so; it is the one Python file in
+`scripts/`.
 
 **Do not hand-zip the apworld.** The component generates the packaged `archipelago.json`,
 adding the `version` and `compatible_version` fields that the source manifest deliberately
@@ -171,6 +183,8 @@ than the one in `Archipelago`, and should be the one used for linting.
 
 You may lint locally using `scripts/run_ruff.ps1`, or directly:
 `ruff check --config ruff.toml worlds/khimera_damg/`
+
+Do not use the `--fix` flag when running ruff (or `-Fix` when running `run_ruff.ps1`). This counts as a write for the purposes of ground rule 1.
 
 Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]` or
 `# ruff: enable[]` is to be viewed as a deliberate choice by the user to go against
