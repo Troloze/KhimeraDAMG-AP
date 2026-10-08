@@ -97,7 +97,10 @@ def _make_source_name(build_name: str) -> str:
 
 
 def _get_mod_version(apw_version: str) -> tuple[int, int, int]:
-    digits = tuple(map(int, apw_version.split(".")))
+    try:
+        digits = tuple(map(int, apw_version.split(".")))
+    except (TypeError, ValueError) as err:
+        raise ValueError("Version strings must be composed of 3 numbers separated by dots.") from err
     if len(digits) != 3:
         raise ValueError("Version strings must be composed of 3 numbers separated by dots.")
     if digits > max_apworld:
@@ -106,7 +109,11 @@ def _get_mod_version(apw_version: str) -> tuple[int, int, int]:
             "Please update the KhimeraDAMG apworld"
         )
     if digits < min_apworld:
-        raise APWorldVersionTooLowError("")  # Genuinely impossible to happen under normal circumstances.
+        raise APWorldVersionTooLowError(
+            "The version of the host apworld is too low for this client. "
+            "This error shouldn't ever happen; if you haven't messed with the "
+            "apworld, please report this to the dev"
+        )  # Genuinely impossible to happen under normal circumstances.
     # This function is barely ever called and the lookup dictionary will never be big enough.
     # It's ok for this to stay suboptimal.
     mod_digits: tuple[int, int, int] | None = max((k for k in apworld_to_mod_map if k <= digits), default=None)
@@ -193,7 +200,7 @@ def _find_patch(build_name: str, apw_version: str) -> Path:
         patch_file.unlink(missing_ok=True)
         raise PatchNotFoundError
 
-    patch_hash = hash_file.read_text(encoding="utf-8-sig")
+    patch_hash = hash_file.read_text(encoding="utf-8-sig    ")
 
     patch = patch_map.get((mod_version, build_name))
     if patch is None:
