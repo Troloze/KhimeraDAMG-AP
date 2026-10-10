@@ -4,6 +4,8 @@ import hashlib
 import io
 import pkgutil
 import re
+import shutil
+import time
 import zipfile
 from pathlib import Path
 
@@ -42,6 +44,10 @@ class PatchNotFoundError(PatcherError):
     pass
 
 
+class SourceCouldNotBeDeletedError(PatcherError):
+    pass
+
+
 # Takes the (host) apworld version as key, and returns the highest compatible mod version.
 # Always remember to update when bumping world version.
 apworld_to_mod_map: dict[tuple[int, int, int], tuple[int, int, int]] = {
@@ -67,7 +73,8 @@ source_map: dict[tuple[int, int, int], dict[str, str]] = {
     for key, value in _patch_builds.items()
 }
 
-max_build_size = max((build.size for build in builds.values()), default=0)
+max_build_size = max((build.total_size for build in builds.values()), default=0)
+max_source_data_size = max((build.size for build in builds.values()), default=0)
 max_apworld = max(apworld_to_mod_map.keys(), default=(0, 0, 0))
 min_apworld = (0, 0, 9)  # Update to (0, 1, 0) on the first release, and keep it.
 
@@ -90,10 +97,6 @@ def _decompose_patch_name(patch_name: str) -> tuple[str, str]:
         raise ValueError("Invalid patch name structure")
     decomposed = patch_name[:-4].split("_", 1)
     return (decomposed[0], decomposed[1])
-
-
-def _make_source_name(build_name: str) -> str:
-    return f"{build_name}.win"
 
 
 def _get_mod_version(apw_version: str) -> tuple[int, int, int]:
@@ -134,11 +137,12 @@ def _get_source_map(mod_version: tuple[int, int, int]) -> dict[str, str]:
 
 # Checks if the current loaded data.win is supported
 # Returns the data.win build name
-def _check_source_build(source_path: str, mod_version: tuple[int, int, int]) -> str:
+def _check_source_build(source_path: Path, mod_version: tuple[int, int, int]) -> str:
     p_map = _get_source_map(mod_version)
+    source_data = Path(source_path) / "data.win"
 
-    with open(source_path, "rb") as f:
-        g_hash_ = hashlib.file_digest(f, "sha256")
+    with open(source_data, "rb") as f:
+        g_hash_ = hashlib.file_digest(f, "md5")
     g_hash = g_hash_.hexdigest()
     if g_hash not in p_map:
         raise UnsupportedBuildError("This build is not supported")
@@ -164,14 +168,14 @@ def _find_diff(build_name: str, mod_version: tuple[int, int, int]) -> bytes:
 
 def _patch(build_name: str, apw_version: str) -> Path:
     mod_version = _get_mod_version(apw_version)
-    source_path = KhimeraDAMGStorageHandler.get_path_raw(_make_source_name(build_name), "source")
-
+    source_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{build_name}")
+    source_data = source_path / "data.win"
     diff = _find_diff(build_name, mod_version)
-    with open(source_path, "rb") as f:
+    with open(source_data, "rb") as f:
         source = f.read()
 
     output: bytes = bsdiff4.patch(source, diff)
-    output_hash = hashlib.sha256(output).hexdigest()
+    output_hash = hashlib.md5(output).hexdigest()
     patch = patch_map.get((mod_version, build_name))
     if patch is None:
         raise HowDidWeGetHereError(
@@ -200,7 +204,7 @@ def _find_patch(build_name: str, apw_version: str) -> Path:
         patch_file.unlink(missing_ok=True)
         raise PatchNotFoundError
 
-    patch_hash = hash_file.read_text(encoding="utf-8-sig    ")
+    patch_hash = hash_file.read_text(encoding="utf-8-sig")
 
     patch = patch_map.get((mod_version, build_name))
     if patch is None:
@@ -247,7 +251,7 @@ def patch_validate(patch_path: Path) -> bool:
     # The caller should handle it.
     patch_data = patch_path.read_bytes()
 
-    test_hash = hashlib.sha256(patch_data).hexdigest()
+    test_hash = hashlib.md5(patch_data).hexdigest()
     if patch.hash_id != test_hash:
         return False
 
@@ -257,7 +261,7 @@ def patch_validate(patch_path: Path) -> bool:
 # Raises UnsupportedBuildError when source_path build is not compatible with apw_version.
 # Raises ValueError when the version is not valid.
 # All other Exceptions raised should not happen under normal circumstances, so let them explode.
-def get_patch(source_path: str, apw_version: str) -> Path:
+def get_patch(source_path: Path, apw_version: str) -> Path:
     mod_version = _get_mod_version(apw_version)
     build = _check_source_build(source_path, mod_version)
     try:
@@ -268,21 +272,148 @@ def get_patch(source_path: str, apw_version: str) -> Path:
     return patch_path
 
 
-def source_validate(build_path: Path) -> bool:
-    build_name = build_path.stem
-    build_hash = _supported_build_hashes.get(build_name)
-    if build_hash is None:
-        return False
+def _hash_multiple_files(file_list: list[Path]) -> str:
+    source_hash = hashlib.new("md5")
+
+    # WARNING: Needs to match KhimeraDAMG-AP-Mod's make_meta.py
+    # Do not change this without making sure the two folder hashing operations are identical.
+    for entry in sorted(file_list, key=lambda entry: entry.name):
+        if not entry.exists() or not entry.is_file():
+            continue
+        source_hash.update(entry.name.encode("utf-8"))
+
+        with open(entry, "rb") as f:
+            file_hash = hashlib.file_digest(f, "md5")
+
+        source_hash.update(file_hash.digest())
+
+    return source_hash.hexdigest()
+
+
+def load_patch(apw_version: str) -> None:
+    current_version = KhimeraDAMGStorageHandler.get("version", "meta", category="current_patch")
+    loaded_path = KhimeraDAMGStorageHandler.get_path_raw(folder="loaded_patch")
+
+    if current_version is not None and current_version == apw_version and loaded_path.exists():
+        current_files: list[str] = KhimeraDAMGStorageHandler.get("files", "meta", category="current_patch")
+        current_hash: str = KhimeraDAMGStorageHandler.get("hash", "meta", category="current_patch")
+
+        file_list = [loaded_path / entry for entry in current_files]
+
+        loaded_hash = _hash_multiple_files(file_list)
+
+        if current_hash == loaded_hash:
+            # No need to load patch.
+            return
+
+    # If we got here we need to load the patch.
+
+    # Cleanup current patch metadata
+    KhimeraDAMGStorageHandler.store(key="current_patch", value=None, file_name="meta")
+
+    attempts = 5
+    nested_errors = []
+    for i in range(attempts):
+        if loaded_path.exists():
+            try:
+                shutil.rmtree(loaded_path)
+            except OSError as err:
+                nested_errors.append(err)
+                if i == attempts - 1:
+                    raise OSError(
+                        f"Failed to delete {loaded_path}"
+                    ) from ExceptionGroup(
+                        f"Several attempts to delete {loaded_path} have failed.",
+                        nested_errors
+                    )
+                time.sleep(0.01)  # Small cooldown to wait for any OS blockings to dissipate. Blocks the thread.
+                continue
+            break
+        break
+
+    loaded_path.mkdir()
+
+    sources = source_get(apw_version)
+    if len(sources) == 0:
+        raise SourceNotFoundError("Could not find a compatible source.")
+
+    # If multiple sources exist, we will use the first available one for now.
+    # Maybe in a future update we can have the user set a preferred version, but this is not a priority rn.
+    source = sources[0]  # The available source, or itch if both (considering itch comes first alphabetically)
+    source_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{source}")
+
+    patch = get_patch(source_path, apw_version)
+
+    source_files = [entry.name for entry in source_path.iterdir()]
+    source_file_paths = [source_path / entry for entry in source_files]
+    loaded_file_paths = [loaded_path / entry for entry in source_files]
+    for entry in source_file_paths:
+        if entry.name == "data.win":
+            shutil.copy2(patch, loaded_path / "data.win")
+            continue
+        shutil.copy2(entry, loaded_path)
+
+    source_hash = _hash_multiple_files(loaded_file_paths)
+
+    current_patch_data = {
+        "version": apw_version,
+        "files": source_files,
+        "hash": source_hash
+    }
+
+    KhimeraDAMGStorageHandler.store_many(
+        list(current_patch_data.keys()),
+        list(current_patch_data.values()),
+        "meta",
+        category="current_patch"
+    )
+
+    return
+
+
+def source_validate(source_path: Path) -> tuple[bool, str | None]:
+    if not source_path.exists():
+        return (False, None)
+
+    data_path = source_path / "data.win"
+
+    if not data_path.exists():
+        return (False, None)
+
+    if data_path.stat().st_size > (max_source_data_size):
+        return (False, None)
+
     try:
-        data = build_path.read_bytes()
+        data = data_path.read_bytes()
     except FileNotFoundError:
-        return False
+        # We do not except OSError, as it is not a fault with the Path or the data.
+        return (False, None)
 
-    test_hash = hashlib.sha256(data).hexdigest()
-    if build_hash != test_hash:
-        return False
+    data_hash = hashlib.md5(data).hexdigest()
 
-    return True
+    build_name = _supported_build_hashes_inverted.get(data_hash)
+    if build_name is None:
+        return (False, None)
+
+    build = builds[build_name]
+
+    candidate_files = [
+        entry
+        for entry in source_path.iterdir()
+        if entry.name in build.file_names and entry.is_file()
+    ]
+
+    total_sum = sum(entry.stat().st_size for entry in candidate_files)
+
+    if total_sum > max_build_size:
+        return (False, None)
+
+    source_hash = _hash_multiple_files(candidate_files)
+
+    if source_hash != build.files_hash_id:
+        return (False, None)
+
+    return (True, build_name)
 
 
 # Returns all available source builds. An empty return means there are no builds for this version.
@@ -291,11 +422,11 @@ def source_get(apw_version: str, *, build_name: str | None = None) -> list[str]:
     build_list = _get_source_map(mod_version).values()
     ret: list[str] = []
     for name in build_list:
-        build_path = KhimeraDAMGStorageHandler.get_path_raw(_make_source_name(name), "source")
+        build_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{name}", skip_mkdir=True)
         if not build_path.exists():
             continue
-        if not source_validate(build_path):
-            build_path.unlink()
+        if not source_validate(build_path)[0]:
+            shutil.rmtree(build_path)
             continue
         if build_name is not None and build_name != name:
             continue
@@ -311,26 +442,39 @@ def get_valid_builds(apw_version: str) -> list[str]:
 
 
 def try_load_build(candidate_path: Path) -> bool:
-    if not candidate_path.exists():
+    validated, build_name = source_validate(candidate_path)
+    if not validated or build_name is None:
         return False
 
-    if candidate_path.stat().st_size > (max_build_size):
-        return False
+    build = builds[build_name]
+    source_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{build_name}")
 
-    try:
-        data = candidate_path.read_bytes()
-    except FileNotFoundError:
-        # We do not except OSError, as it is not a fault with the Path or the data.
-        return False
+    # Check to see if the current loaded build is fine
+    validated, old_build_name = source_validate(source_path)
+    if validated and build_name == old_build_name:
+        # No need to copy, but we need to validate the steam_appid.txt file separately here
+        if build_name.startswith("steam"):
+            steam_app_id = source_path / "steam_appid.txt"
+            if not steam_app_id.exists() or steam_app_id.read_text(encoding="utf-8-sig") != "467380":
+                steam_app_id.write_text("467380", encoding="utf-8")
+        return True
 
-    data_hash = hashlib.sha256(data).hexdigest()
+    if source_path.exists():
+        try:
+            shutil.rmtree(source_path)
+        except OSError as err:
+            raise SourceCouldNotBeDeletedError("The existing source folder could not be deleted completely.") from err
 
-    build_name = _supported_build_hashes_inverted.get(data_hash)
-    if build_name is None:
-        return False
+    source_path.mkdir(exist_ok=True)
 
-    source_path = KhimeraDAMGStorageHandler.get_path_raw(_make_source_name(build_name), "source")
+    valid_files = [candidate_path / entry for entry in build.file_names]
 
-    source_path.write_bytes(data)
+    for entry in valid_files:
+        shutil.copy2(entry, source_path)
+
+    if build_name.startswith("steam"):
+        steam_app_id = source_path / "steam_appid.txt"
+        if not steam_app_id.exists() or steam_app_id.read_text(encoding="utf-8-sig") == "467380":
+            steam_app_id.write_text("467380", encoding="utf-8")
 
     return True

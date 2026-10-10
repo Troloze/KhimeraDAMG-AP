@@ -66,8 +66,11 @@ unique_patch_data: dict[str, Any] = {}
 for version_name, version_meta_data in meta_data.items():
     for build, build_data in version_meta_data.items():
         b_data = {}
-        b_data["size"] = build_data["source_size"]
-        b_data["hash"] = build_data["source_sha256"]
+        b_data["size"] = build_data["source_data_size"]
+        b_data["hash"] = build_data["source_hash"]
+        b_data["total_size"] = build_data["source_total_size"]
+        b_data["file_list"] = build_data["source_file_list"]
+        b_data["total_hash"] = build_data["source_total_hash"]
         if build in unique_build_data:
             if b_data["size"] != unique_build_data[build]["size"]:
                 raise RuntimeError(f"Release {version_name} is malformed, different \"{build}\" sizes don't match.")
@@ -78,7 +81,7 @@ for version_name, version_meta_data in meta_data.items():
         p_data = {}
         p_name = f"{version_name}-{build}"
         p_data["size"] = build_data["result_size"]
-        p_data["hash"] = build_data["result_sha256"]
+        p_data["hash"] = build_data["result_hash"]
         p_data["build"] = build
         p_data["version"] = version_name
         unique_patch_data[p_name] = p_data
@@ -102,8 +105,11 @@ except TypeError as err:
     ) from err
 
 
-def make_source(name: str, hash_id: str, size: int) -> str:
-    return f'SourceData(name="{name}", hash_id="{hash_id}", size={size})'
+def make_source(name: str, hash_id: str, size: int, total_size: int, file_names: list[str], files_hash_id: str) -> str:
+    return (
+        f'SourceData(name="{name}", hash_id="{hash_id}", size={size}, '
+        f'total_size={total_size}, file_names={file_names}, files_hash_id="{files_hash_id}")'
+    )
 
 
 def make_patch(
@@ -130,7 +136,18 @@ def make_builds_map() -> str:
     output = "builds: dict[str, SourceData] = {\n"
     entries: list[str] = []
     for name, data in unique_build_data.items():
-        entries.append(f'    "{name}": {make_source(name, data["hash"], data["size"])}')
+        entries.append(
+            f'    "{name}": {
+                make_source(
+                    name,
+                    data["hash"],
+                    data["size"],
+                    data["total_size"],
+                    data["file_list"],
+                    data["total_hash"]
+                )
+            }'
+        )
     output += ",\n".join(entries)
     output += "\n}\n"
     return output

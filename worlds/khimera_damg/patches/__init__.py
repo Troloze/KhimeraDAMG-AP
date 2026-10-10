@@ -7,6 +7,9 @@ class SourceData:
     name: str
     hash_id: str
     size: int
+    total_size: int
+    file_names: list[str]
+    files_hash_id: str
 
 
 @dataclass(frozen=True)
