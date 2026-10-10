@@ -8,7 +8,7 @@ from typing import Any
 
 from NetUtils import NetworkItem  # type: ignore
 
-from ..types import ConnectionContext, LocationInformation, RuntimeInformation
+from ...types import ConnectionContext, LocationInformation, RuntimeInformation
 from .classes import CommunicationAgent
 from .contract_storage import get_agent
 

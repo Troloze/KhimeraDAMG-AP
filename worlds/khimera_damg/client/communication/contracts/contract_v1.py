@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 from NetUtils import NetworkItem  # type: ignore
 from platformdirs import user_data_dir
 
-from ...misc import normalize_and_sanitize
+from ....misc import normalize_and_sanitize
 from ..classes import CommunicationContract
 
 logger = logging.getLogger("Client")
