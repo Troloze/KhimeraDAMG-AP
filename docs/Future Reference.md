@@ -12,6 +12,9 @@ These will be implemented eventually.
   - Requires changing region logic to allow sub-regions.
   - If I am going to do that, I'd rather make every single screen a region.
   - For that I will need to make a structured view of all stages in the game, big and time consuming task. 
+- Rework the apworld packages and modules in favour of maintainability.
+  - Specifically the client/client.py module is in dire need of splitting.
+  - Remove definitions other than `__all__` from all `__init__.py` files as well.
 
 # Client
 - Command for launching the game.

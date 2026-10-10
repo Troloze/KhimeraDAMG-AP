@@ -8,9 +8,9 @@ from typing import Any
 
 from NetUtils import NetworkItem  # type: ignore
 
-from ..types import ConnectionContext, LocationInformation, RuntimeInformation
+from ...types import ConnectionContext, LocationInformation, RuntimeInformation
 from .classes import CommunicationAgent
-from .storage import get_agent
+from .contract_storage import get_agent
 
 __all__ = ["KhimeraDAMGCommunicationInterface"]
 

@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from ..types import ConnectionContext, LocationInformation
+from ...types import ConnectionContext, LocationInformation
 
 logger = logging.getLogger("Client")
 

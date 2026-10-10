@@ -4,3 +4,4 @@ __pycache__/
 
 /build/
 /worlds/khimera_damg/patches/*.zip
+/worlds/khimera_damg/patches/data.py

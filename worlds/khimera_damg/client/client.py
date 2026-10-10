@@ -19,11 +19,11 @@ from CommonClient import (  # type: ignore
 )
 from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ignore
 
-from . import APWORLD_VERSION
+from .. import APWORLD_VERSION
 from .communication import KhimeraDAMGCommunicationInterface
+from ..types import ConnectionContext, LocationInformation, RuntimeInformation
 from .launcher import KhimeraDAMGLauncher
 from .storage import KhimeraDAMGStorageHandler
-from .types import ConnectionContext, LocationInformation, RuntimeInformation
 
 if TYPE_CHECKING:
     import kvui  # type: ignore
@@ -436,7 +436,7 @@ class KhimeraDAMGConnectionState:
         keys = [entry[1] for entry in data]
         values = [entry[2] for entry in data]
         try:
-            KhimeraDAMGStorageHandler.store_many(keys, values, self.context.game_id, "game_data")
+            KhimeraDAMGStorageHandler.store_many(keys, values, self.context.game_id, "game_data", folder="game_data")
         except OSError:
             # Don't ack, don't signal, the game will send it again later.
             return
@@ -456,6 +456,7 @@ class KhimeraDAMGContext(CommonContext):
     items_handling = 0b111
 
     def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
+
         super().__init__(server_address, password)
         self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher()
         self.slot_data: dict[str, Any] = {}
@@ -513,7 +514,7 @@ class KhimeraDAMGContext(CommonContext):
             self.connection_state.set_item_ack(game_package.ack)
             if game_package.ack > last_ack:
                 if self.game_id is not None:
-                    KhimeraDAMGStorageHandler.store("last_ack", last_ack, self.game_id)
+                    KhimeraDAMGStorageHandler.store("last_ack", last_ack, self.game_id, folder="game_data")
 
         # Checks for both None and False
         if game_package.is_win and not self.finished_game:
@@ -573,7 +574,7 @@ class KhimeraDAMGContext(CommonContext):
         game_status = None
         while not self.server_loop_stop_event.is_set():
             start = time.perf_counter()
-            # ruff: disable[PLW0717]
+            # ruff: disable[too-many-statements-in-try-clause]
             try:
                 # Heartbeat probe
                 if game_status is None:
@@ -595,7 +596,7 @@ class KhimeraDAMGContext(CommonContext):
             except Exception as err:
                 logger.exception(f"An exception was raised in server loop: {err}")
             await asyncio.sleep(max(0.0, self.server_loop_cooldown - (time.perf_counter() - start)))
-            # ruff: enable[PLW0717]
+            # ruff: enable[too-many-statements-in-try-clause]
         self.server_loop_stop_event = None
 
     def _get_slot_data(self, args: dict) -> bool:
@@ -611,14 +612,14 @@ class KhimeraDAMGContext(CommonContext):
         return True
 
     def _make_cctx(self) -> ConnectionContext:
-        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0)  # type: ignore
+        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
         items = self.items_received  # Accessed asynchronously, state can change between a loop's readings
         item_list = [(i + 1, items[i]) for i in range(0, len(items))]
         win_status = self.stored_data.get(f"_read_client_status_{self.team}_{self.slot}")
         # Resolves to "False" if win_status is None
         is_win = win_status == ClientStatus.CLIENT_GOAL
         # This will return the entirety of the "game_data" category.
-        game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {})  # type: ignore
+        game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {}, folder="game_data")  # type: ignore
         return ConnectionContext(
             ap_version=Utils.__version__,
             host_world_version=self.host_world_version,  # type: ignore
@@ -635,7 +636,7 @@ class KhimeraDAMGContext(CommonContext):
         )
 
     async def _start_up_game_processes(self) -> None:
-        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0)  # type: ignore
+        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
         self.cctx = self._make_cctx()
         self.li = LocationInformation(
             not self.slot_data["is_race"],
@@ -675,12 +676,11 @@ class KhimeraDAMGContext(CommonContext):
 
         # Launch game first!
         if not self.launcher.is_game_running:
-            if self.launcher.stored_data_validated:
-                # Prompt user for permission to launch game
-                try:
-                    self.launcher.launch_game(self.host_world_version)  # type: ignore
-                except Exception:
-                    logger.exception("Khimera launch failed; server connection remains active.")
+            # Prompt user for permission to launch game
+            try:
+                self.launcher.launch_game(self.host_world_version)  # type: ignore
+            except Exception:
+                logger.exception("Khimera launch failed; server connection remains active.")
 
         # Wait for win status
         try:
