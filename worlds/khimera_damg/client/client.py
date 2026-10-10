@@ -21,7 +21,7 @@ from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ign
 
 from .. import APWORLD_VERSION
 from .communication import KhimeraDAMGCommunicationInterface
-from ..types import ConnectionContext, LocationInformation, RuntimeInformation
+from .types import ConnectionContext, LocationInformation, RuntimeInformation
 from .launcher import KhimeraDAMGLauncher
 from .storage import KhimeraDAMGStorageHandler
 
