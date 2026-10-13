@@ -245,8 +245,10 @@ The apworld is meant to be submitted to the ionium index
 below are acceptance requirements for that release, not style preferences.
 
 The index's own README opens with "Do **NOT** make demands of apworld authors to cater their
-apworlds for inclusion in this index." Respect that: raise these points when reviewing code
-that already touches the relevant area, not as a standing checklist to push on the developer.
+apworlds for inclusion in this index." That clause is aimed at third parties pestering other
+developers to get their apworlds into the index. It does not apply here: the developer of this
+apworld has chosen to submit it, so the index rules are this project's own requirements. Treat
+them as a standing checklist, raise any violation you find, and report index readiness plainly.
 
 ### Hard requirements for inclusion
 
