@@ -5,6 +5,7 @@ from typing import Any
 
 from NetUtils import NetworkItem  # type: ignore
 
+
 @dataclass(frozen=True)
 class ConnectionContext:
     ap_version: str
@@ -61,6 +62,8 @@ class RuntimeInformation:
     death_ack: int | None = None
     ack: int | None = None
     is_win: bool | None = None
+    req_cctx: bool | None = None  # There really should be a better way to pass this information
+    req_li: bool | None = None    # But this will do for now.
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,9 +74,9 @@ class RuntimeInformation:
             "death_link":       self.death_link,
             "death_ack":        self.death_ack,
             "data":             self.data,
-            "data_acks":         self.data_acks,
+            "data_acks":        self.data_acks,
             "ack":              self.ack,
-            "is_win":           self.is_win
+            "is_win":           self.is_win,
         }
 
     def merge(self, merger: RuntimeInformation | None, merger_old: bool = False) -> RuntimeInformation:

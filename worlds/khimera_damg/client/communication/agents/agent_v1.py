@@ -115,8 +115,8 @@ class AgentV1(CommunicationAgent):
 
         # No need to error handle these, the .gsreq flag works to cover
         # for errors here.
-        self._send_connection_context()
-        self._send_location_information()
+        # self._send_connection_context()
+        # self._send_location_information()
 
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
@@ -127,10 +127,6 @@ class AgentV1(CommunicationAgent):
         ).start()
 
         self.communication_opened = True
-
-    def reconnect(self, connection_context: ConnectionContext) -> None:
-        with self.context_lock:
-            self.connection_context = connection_context
 
     def close_communication(self) -> None:
         self.communication_closed = True
@@ -200,8 +196,8 @@ class AgentV1(CommunicationAgent):
         death_link: tuple[str, int, str] | None = None
         death_ack: int | None = None
         data_acks: list[int] | None = []
-        req_cctx = False
-        req_li = False
+        req_cctx: ConnectionContext | None = None
+        req_li: LocationInformation | None = None
         # heartbeat and ack should remember their last values instead of
         # sending empty/null/nodata values.
 
@@ -222,8 +218,14 @@ class AgentV1(CommunicationAgent):
                 self.last_connection_status = entry[1]
             if entry[0] == "req_cctx":
                 req_cctx = entry[1]
+                if req_cctx is not None:
+                    with self.context_lock:
+                        self.connection_context = req_cctx
             if entry[0] == "req_li":
                 req_li = entry[1]
+                # if req_li is not None:
+                #     self.location_information = req_li
+                # LI does not update, so no need for this.
 
         item_list: list[tuple[int, NetworkItem]] | None = sorted(item_map.items())
 
@@ -246,7 +248,7 @@ class AgentV1(CommunicationAgent):
             is_win=False,
         )
         rs = (self.last_connection_status, heartbeat)
-        req = (req_cctx, req_li)
+        req = (req_cctx is not None, req_li is not None)
 
         return (ri, rs, req)
 

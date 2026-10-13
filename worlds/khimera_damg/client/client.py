@@ -19,11 +19,12 @@ from CommonClient import (  # type: ignore
 )
 from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ignore
 
-from .. import APWORLD_VERSION
+from .. import APWORLD_VERSION, GAME_FULL_NAME
 from .communication import KhimeraDAMGCommunicationInterface
-from .types import ConnectionContext, LocationInformation, RuntimeInformation
 from .launcher import KhimeraDAMGLauncher
+from .patcher import SourceNotFoundError, source_get, try_load_build
 from .storage import KhimeraDAMGStorageHandler
+from .types import ConnectionContext, LocationInformation, RuntimeInformation
 
 if TYPE_CHECKING:
     import kvui  # type: ignore
@@ -50,6 +51,10 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         self.continue_time: float | None = None
 
     if (False):  # Debug commands, not available for the actual release of the apworld
+        ##################
+        # Debug Handlers #
+        ##################
+
         def _cmd_force_win(self) -> None:
             """ DEBUG COMMAND.\nForces a win """
             # Deliberately doesn't check for command_running.
@@ -71,14 +76,9 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                 if self.ctx.communication_interface is not None:
                     self.ctx.communication_interface.send_death_link("", -1, "")
 
-    def _cmd_status(self) -> None:
-        """Check Khimera DAMG Connection State"""
-        # Deliberately doesn't check for command_running.
-        self.continue_context = None
-        self.continue_time = None
-        self.continue_args = None
-        if isinstance(self.ctx, KhimeraDAMGContext):
-            logger.info(self.ctx.get_khimera_damg_status())
+    ######################
+    # Game Data Handlers #
+    ######################
 
     def _cmd_export_game_data(self, seed: str = "", slot_name: str = "") -> None:
         """
@@ -100,7 +100,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         if slot_name == "" or seed == "":
             g_id = self.ctx.game_id
             if g_id is None:
-                logger.info("Please provide the name and seed parameters,"
+                logger.info("Please provide the name and seed parameters, "
                             "or use this command while the client is connected."
                 )
                 return
@@ -123,8 +123,8 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                 logger.warning("Failed to export game data.")
             finally:
                 command_processor.command_running = False
-        Utils.async_start(exporter(g_id, self))
         self.command_running = True
+        Utils.async_start(exporter(g_id, self))
         logger.info("Opening the file explorer...")
 
     def _cmd_import_game_data(self) -> None:
@@ -161,7 +161,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                 logger.warning("Cannot import data to the currently loaded slot. Close the game and try again.")
                 return
 
-            logger.info("There already is a data file for the loaded slot; would you like to overwrite it?"
+            logger.info("There already is a data file for the loaded slot; would you like to overwrite it? "
                         "This operation is irreversible"
             )
             logger.info("Send /confirm in order to import your game data.")
@@ -169,9 +169,8 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             command_processor.continue_time = time.perf_counter()
             command_processor.continue_args = {"file_name": file_name}
             command_processor.command_running = False
-
-        Utils.async_start(importer(self))
         self.command_running = True
+        Utils.async_start(importer(self))
 
     def _cmd_reset_game_data(self, seed: str = "", slot_name: str = "") -> None:
         """
@@ -235,25 +234,94 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             logger.info("Note: This will not delete the currently loaded game data.")
         logger.info("Send /confirm in order to wipe the game data.")
 
+    #####################
+    # Launcher Handlers #
+    #####################
+
     def _cmd_launch(self) -> None:
-        """ WIP """
+        """
+            Launches the game.
+            [Requires an active connection]
+        """
         if self.command_running:
             logger.warning("Theres a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
         self.continue_args = None
-        pass
+        if (
+            not self.ctx._is_server_connected() or
+            self.ctx.host_world_version is None or
+            self.ctx.current_address is None or
+            self.ctx.slot_name is None or
+            self.ctx.game_id is None
+        ):
+            logger.warning("Failed to launch game: You can only launch a game when connected to a slot.")
+            return
+        if self.ctx.launcher.tracking:
+            logger.warning("Failed to launch game: There already is game running.")
+            return
+
+        async def launch(ctx: KhimeraDAMGContext) -> None:
+            try:
+                await self.ctx.launcher.launch_game(
+                    ctx.host_world_version,  # type: ignore
+                    ctx.current_address,  # type: ignore
+                    ctx.slot_name,  # type: ignore
+                    ctx.game_id  # type: ignore
+                )
+            except Exception as err:
+                logger.warning(str(err))
+            finally:
+                self.command_running = False
+        self.command_running = True
+        Utils.async_start(launch(self.ctx))
 
     def _cmd_close_game(self) -> None:
-        """ WIP """
+        """ Closes the game. """
         if self.command_running:
             logger.warning("Theres a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
         self.continue_args = None
-        pass
+        if not self.ctx.launcher.tracking:
+            logger.warning("The client could not detect any instance of the game running.")
+            return
+        
+        async def terminate(ctx: KhimeraDAMGContext) -> None:
+            try:
+                await ctx.launcher.terminate()
+            finally:
+                self.command_running = False
+
+        self.command_running = True
+        Utils.async_start(terminate(self.ctx))
+
+    ########
+    # Misc #
+    ########
+
+    def _cmd_status(self) -> None:
+        """Check Khimera DAMG Connection State"""
+        # Deliberately doesn't check for command_running.
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+        if isinstance(self.ctx, KhimeraDAMGContext):
+            logger.info(self.ctx.get_khimera_damg_status())
+
+    def _cmd_connection_info(self) -> None:
+        """ Prints connection information """
+        self.continue_context = None
+        self.continue_time = None
+        self.continue_args = None
+        if isinstance(self.ctx, KhimeraDAMGContext):
+            logger.info(
+                f"Slot name: {self.ctx.slot_name}\n"
+                f"Address:   {self.ctx.current_address}\n"
+                f"Seed:      {self.ctx.host_seed}"
+            )
 
     def _cmd_confirm(self) -> None:
         """
@@ -278,9 +346,9 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             has_gid = None
             if self.continue_args is not None:
                 has_gid = self.continue_args.get("g_id")
-            logger.info("This will delete all *archipelago related*"
-                        "Khimera: Destroy All Monster Girls game data file in your machine."
-                        " Are you absolutely sure this is what you want to do?")
+            logger.info("This will delete all *archipelago related* "
+                        "Khimera: Destroy All Monster Girls game data file in your machine. "
+                        "Are you absolutely sure this is what you want to do?")
             if has_gid:
                 logger.info("Note: This will not delete the currently loaded game data.")
             logger.info("Send /confirm again in order to wipe the game data. (LAST WARNING)")
@@ -299,7 +367,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             return
         if self.continue_context == "reset":
             if self.continue_args is None or "g_id" not in self.continue_args:
-                logger.warning("Error: Attempt to execute a reset action without defining import arguments"
+                logger.warning("Error: Attempt to execute a reset action without defining import arguments "
                                "(This is the dev's fault, please notify them)"
                 )
                 return
@@ -314,7 +382,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             return
         if self.continue_context == "import":
             if self.continue_args is None or "file_name" not in self.continue_args:
-                logger.warning("Error: Attempt to execute an import action without defining import arguments"
+                logger.warning("Error: Attempt to execute an import action without defining import arguments "
                                "(This is the dev's fault, please notify them)"
                 )
                 return
@@ -331,17 +399,19 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
 
 class KhimeraDAMGConnectionState:
     def __init__(self, ctx: KhimeraDAMGContext) -> None:
-        self.context = ctx
+        self.context: KhimeraDAMGContext = ctx
         self.lock: threading.Lock = threading.Lock()
         self.game_last_deathlink: tuple[str, int, str] | None = None
         self.gdl_ack: set[int] = set()
         self.pending_gdl_ack: int | None = None
         self.host_last_deathlink: tuple[str, int, str] | None = None
         self.locations_acked: set[int] = set()
-        self.hdl_id = 0
+        self.hdl_id: int = 0
         self._goal_status_ready: asyncio.Event | None = None
         self.pending_acked_data: set[int] | None = None
-        self.last_ack = 0
+        self.last_ack: int = 0
+        self.req_cctx: bool | None = None
+        self.req_li: bool | None = None
 
     def reset(self) -> None:
         with self.lock:
@@ -449,14 +519,29 @@ class KhimeraDAMGConnectionState:
             self.pending_acked_data = None
             return list(pending) if pending is not None else None
 
+    def set_req_cctx(self) -> None:
+        self.req_cctx = True
+
+    def set_req_li(self) -> None:
+        self.req_li = True
+
+    def get_req_cctx(self) -> bool | None:
+        ret = self.req_cctx
+        self.req_cctx = None
+        return ret
+
+    def get_req_li(self) -> bool | None:
+        ret = self.req_li
+        self.req_li = None
+        return ret
+
 
 class KhimeraDAMGContext(CommonContext):
     command_processor = KhimeraDAMGCommandProcessor
-    game = "Khimera: Destroy All Monster Girls"
+    game = GAME_FULL_NAME
     items_handling = 0b111
 
     def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
-
         super().__init__(server_address, password)
         self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher()
         self.slot_data: dict[str, Any] = {}
@@ -465,17 +550,21 @@ class KhimeraDAMGContext(CommonContext):
         self.interface_stop = None
         self.is_game_connected = False
         self.slot_data_empty_once: bool = False
-        self.server_loop_task: asyncio.Task | None = None
-        self.server_loop_stop_event: asyncio.Event | None = None
-        self.server_loop_cooldown: float = 0.05
+        self.communication_task: asyncio.Task | None = None
+        self.communication_stop_event: asyncio.Event | None = None
+        self.communication_cooldown: float = 0.05
         self.connection_state: KhimeraDAMGConnectionState = KhimeraDAMGConnectionState(self)
         self.json_to_text = KhimeraDAMGJSONToTextParser(self)
         self.slot_name: str | None = None
         self.host_seed: str | None = None
+        self.current_address: str | None = None
         self.game_id: str | None = None
         self.host_world_version: str | None = None
         self.cctx: ConnectionContext | None = None
         self.li: LocationInformation | None = None
+        self._connection_task: asyncio.Task | None = None
+        self._connection_gui_bypass: bool = False
+        self._kvui_started: bool = False
 
     async def server_auth(self, password_requested: bool = False) -> None:
         if password_requested and not self.password:
@@ -516,6 +605,13 @@ class KhimeraDAMGContext(CommonContext):
                 if self.game_id is not None:
                     KhimeraDAMGStorageHandler.store("last_ack", last_ack, self.game_id, folder="game_data")
 
+        if game_package.req_cctx is not None:
+            self.cctx = self._make_cctx()
+            self.connection_state.set_req_cctx()
+
+        if game_package.req_li is not None:
+            self.connection_state.set_req_li()
+
         # Checks for both None and False
         if game_package.is_win and not self.finished_game:
             self.finished_game = True
@@ -555,7 +651,15 @@ class KhimeraDAMGContext(CommonContext):
         if data_ack is not None and self.communication_interface is not None:
             self.communication_interface.send_data_acks(data_ack)
 
-    async def _server_loop(self) -> None:
+        req_cctx = self.connection_state.get_req_cctx()
+        if req_cctx is not None and self.communication_interface is not None:
+            self.communication_interface.send_connection_context(self.cctx)  # type: ignore
+        
+        req_li = self.connection_state.get_req_li()
+        if req_li is not None and self.communication_interface is not None:
+            self.communication_interface.send_location_information(self.li)  # type: ignore
+
+    async def _communication_loop(self) -> None:
         if self.host_world_version is None:
             logger.exception("Attempt to start the server loop without an active connection")
             return
@@ -570,16 +674,17 @@ class KhimeraDAMGContext(CommonContext):
             return
 
         # Only sends things UP to the host
-        self.server_loop_stop_event = asyncio.Event()
+        self.communication_stop_event = asyncio.Event()
         game_status = None
-        while not self.server_loop_stop_event.is_set():
+        while not self.communication_stop_event.is_set():
             start = time.perf_counter()
             # ruff: disable[too-many-statements-in-try-clause]
             try:
                 # Heartbeat probe
                 if game_status is None:
                     game_status = asyncio.create_task(
-                        self.communication_interface.probe_game_status(self.host_world_version)
+                        self.communication_interface.probe_game_status(self.host_world_version),
+                        name="kdamg_client_probe_heartbeat"
                     )
                 elif game_status.done():
                     self.is_game_connected = await game_status
@@ -595,21 +700,19 @@ class KhimeraDAMGContext(CommonContext):
                 await self._process_connection_state()
             except Exception as err:
                 logger.exception(f"An exception was raised in server loop: {err}")
-            await asyncio.sleep(max(0.0, self.server_loop_cooldown - (time.perf_counter() - start)))
+            await asyncio.sleep(max(0.0, self.communication_cooldown - (time.perf_counter() - start)))
             # ruff: enable[too-many-statements-in-try-clause]
-        self.server_loop_stop_event = None
+        self.communication_stop_event = None
 
-    def _get_slot_data(self, args: dict) -> bool:
-        self.slot_data = args.get("slot_data", {})
-        if len(self.slot_data) == 0:
-            logger.warning('"slot_data" is empty, closing the connection.')
-            if not self.slot_data_empty_once:
-                self.slot_data_empty_once = True
-                Utils.async_start(self.disconnect(True))
-            else:
-                Utils.async_start(self.disconnect(False))
-            return False
-        return True
+    async def _close_communication(self) -> None:
+        if self.communication_interface is not None:
+            await self.communication_interface.stop()
+            self.communication_interface = None
+        if self.communication_stop_event is not None:
+            self.communication_stop_event.set()
+        if self.communication_task is not None:
+            await self.communication_task
+            self.communication_task = None
 
     def _make_cctx(self) -> ConnectionContext:
         last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
@@ -655,12 +758,8 @@ class KhimeraDAMGContext(CommonContext):
         if self.slot is None or self.host_seed is None:
             # Nothing connected, we need something connected.
             return
-        self.slot_name = self.slot_info[self.slot].name
-        self.host_world_version = self.slot_data["apworld_version"]
         if self.host_world_version is None or self.slot_name is None:
             return
-
-        self.game_id = get_game_id(self.slot_name, self.host_seed)
 
         if (
             self.communication_interface is not None and
@@ -671,14 +770,18 @@ class KhimeraDAMGContext(CommonContext):
             self.communication_interface = None
             self.connection_state.reset()
 
-            # Insert game quitting logic
-            # If game is open open a popup prompting the user for confirmation
+        # Insert game quitting logic
+        # If game is open open a popup prompting the user for confirmation
 
         # Launch game first!
-        if not self.launcher.is_game_running:
-            # Prompt user for permission to launch game
+        if not self.launcher.tracking:
             try:
-                self.launcher.launch_game(self.host_world_version)  # type: ignore
+                await self.launcher.launch_game(
+                    self.host_world_version,
+                    self.current_address,  # type: ignore
+                    self.slot_name,
+                    self.game_id  # type: ignore
+                )
             except Exception:
                 logger.exception("Khimera launch failed; server connection remains active.")
 
@@ -694,30 +797,126 @@ class KhimeraDAMGContext(CommonContext):
                 await self._start_up_game_processes()
             except Exception:
                 logger.exception("Khimera setup failed; server connection remains active.")
-        else:
-            self.communication_interface.reconnect(self._make_cctx())
 
-        if self.server_loop_task is None:
-            self.server_loop_task = asyncio.create_task(self._server_loop())
+        if self.communication_task is None:
+            self.communication_task = asyncio.create_task(
+                self._communication_loop(),
+                name="kdamg_client_communication_loop"
+            )
+
+    async def _validate_connection(self) -> bool:
+        if self.slot is None or self.host_seed is None or self.current_address is None:
+            msg = self.launcher._message(
+                "Failed to connect",
+                "Unknown Common Client error.\nPlease try again later.",
+                error=True
+            )
+            logger.warning(
+                "Unknown Common Client error.\nPlease try again later.",
+            )
+            if msg is not None:
+                msg.open()
+            return False
+        game = self.slot_info[self.slot].game
+        if game != GAME_FULL_NAME:
+            msg = self.launcher._message(
+                "Failed to connect",
+                f"There was an attempt to connect to an unrecognized game: \"{game}\".\n"
+                "This client should only be used for \"Khimera: Destroy All Monster Girls\".",
+                error=True
+            )
+            logger.warning(
+                f"There was an attempt to connect to an unrecognized game: \"{game}\".\n"
+                "This client should only be used for \"Khimera: Destroy All Monster Girls\"."
+            )
+            if msg is not None:
+                msg.open()
+            return False
+        self.slot_name = self.slot_info[self.slot].name
+        self.game_id = get_game_id(self.slot_name, self.host_seed)  # type: ignore
+        self.host_world_version = self.slot_data["apworld_version"]
+
+        if self.launcher.tracking:
+            if APWORLD_VERSION != self.launcher.apw_version:
+                msg = self.launcher._message(
+                    "Version mismatch.",
+                    "There was an attempt to connect while a game launched on a different version "
+                    "of the apworld is running.\n"
+                    "Please close the game before attempting to connect.",
+                    error=True
+                )
+                logger.warning(
+                    "There was an attempt to connect while a game launched on a different version "
+                    "of the apworld is running.\n"
+                    "Please close the game before attempting to connect."
+                )
+                if msg is not None:
+                    msg.open()
+                return False
+
+            # Validation only looks at game_id
+            if self.game_id != self.launcher.game_id:
+
+                msg = self.launcher._message(
+                    "Failed to connect",
+                    "There was an attempt to connect to a different slot while the game is open.\n"
+                    "Please close the game before switching slots.",
+                    error=True
+                )
+                logger.warning(
+                    "There was an attempt to connect to a different slot while the game is open.\n"
+                    "Please close the game before switching slots."
+                )
+                if msg is not None:
+                    msg.open()
+                return False
+        return True
+
+    async def _get_slot_data(self, args: dict) -> bool:
+        self.slot_data = args.get("slot_data", {})
+        if len(self.slot_data) == 0:
+            logger.warning("\"slot_data\" is empty, closing the connection.")
+            if not self.slot_data_empty_once:
+                self.slot_data_empty_once = True
+                await self.disconnect(True)
+            else:
+                await self.disconnect(False)
+            return False
+        return True
+
+    async def _on_connected(self, args: dict) -> None:
+        self.current_address = self.server_address
+        # Get slot data
+        if not await self._get_slot_data(args):
+            return
+        self.slot_data_empty_once = False
+
+        if not await self._validate_connection():
+            await self.disconnect()
+            return
+        # Ask the host to notify the client if the game has goaled
+        self.set_notify(f"_read_client_status_{self.team}_{self.slot}")
+        # Goal status event that triggers when the server provides the goal status.
+        self._goal_status_ready = asyncio.Event()
+
+        if self.slot_data["options"]["death_link"]:
+            # Set death link up if enabled.
+            Utils.async_start(self.update_death_link(True))
+        else:
+            # Disable death link if not enabled.
+            Utils.async_start(self.update_death_link(False))
+        # Start launcher and communication handler.
+        await self._delayed_startup()
 
     def on_package(self, cmd: str, args: dict) -> None:
         super().on_package(cmd, args)
         if cmd == "RoomInfo":
             self.host_seed = args.get("seed_name")
         elif cmd == "Connected":
-            # Ask the host to notify the client if the game has goaled
-            self.set_notify(f"_read_client_status_{self.team}_{self.slot}")
-            # Enable death link
-            Utils.async_start(self.update_death_link(True))
-            # Goal status event that triggers when
-            self._goal_status_ready = asyncio.Event()
-            # Get slot data
-            if not self._get_slot_data(args):
-                return
-            self.slot_data_empty_once = False
-            # Start launcher and communication handler.
-            self._startup_task = asyncio.create_task(self._delayed_startup())
-
+            self._connection_task = asyncio.create_task(
+                self._on_connected(args),
+                name="kdamg_client_connection_routine"
+            )
         elif cmd == "Retrieved":
             # Is slot cleared
             if (
@@ -738,6 +937,20 @@ class KhimeraDAMGContext(CommonContext):
         message = data.get("cause", "")
         self.connection_state.set_host_deathlink(source, message)
         return super().on_deathlink(data)
+
+    async def connect(self, address: str | None = None) -> None:
+        if not self._kvui_started:
+            self._connection_gui_bypass = True
+            if self.launcher.tracking:
+                logger.warning(
+                    "A game process from a previous session has been detected. "
+                    f"The client was configured to automatically connect to {address}; "
+                    "if the slot connected to is not the as the slot used when launching the game, "
+                    "you will not be able to connect. "
+                    "If this is the case, please close the game and try again; "
+                    "disregard this message otherwise."
+                )
+        return await super().connect(address)
 
     async def disconnect(self, allow_autoreconnect: bool = False) -> None:
         await super().disconnect(allow_autoreconnect)
@@ -769,10 +982,86 @@ class KhimeraDAMGContext(CommonContext):
             f"\nGame connected: {self.is_game_connected},"
             f"\nSlot data: {self.slot_data}")
 
+    async def detect_continued_game(self) -> None:
+        if self.launcher.tracking:
+            if APWORLD_VERSION != self.launcher.apw_version:
+                msg = self.launcher._message(
+                    "Version mismatch.",
+                    "A game running from a previous session has been detected. "
+                    "However, its version does not match the current apworld's version.\n"
+                    "Please close the game before attempting to connect.",
+                    error=True
+                )
+                logger.warning(
+                    "A game running from a previous session has been detected. "
+                    "However, its version does not match the current apworld's version.\n"
+                    "Please close the game before attempting to connect."
+                )
+                if msg is not None:
+                    msg.open()
+                return
+
+            actions = (
+                "Reconnect",
+                "Dismiss",
+            )
+            action = await self.launcher._prompt(
+                "Game still running",
+                "A running instance of the game from last session has been detected, "
+                "would you like to reconnect to its slot?\n"
+                "Note: You won't be able to connect to another slot while the game is open."
+                ,
+                actions
+            )
+
+            if action == actions[0]:
+                self.auth = self.launcher.slot_name
+                await self.connect(self.launcher.address)
+        return
+
+    async def on_kvui_start(self) -> None:
+        if self._connection_gui_bypass:
+            return
+        # Continued game run detection
+        await self.detect_continued_game()
+
+        if self.launcher.tracking:
+            # A game is already being tracked so no need to continue.
+            return
+
+        # Startup prompt
+        if source_get(APWORLD_VERSION, return_any=True):
+            # There's at least one source compatible with this world.
+            return
+        path = await self.launcher.startup_prompt()
+        if path is None:
+            return
+
+        try:
+            try_load_build(path)
+        except (OSError, SourceNotFoundError) as err2:
+            msg = self.launcher._message("Couldn't load build", "Please try again later.", error=True)
+            if msg is not None:
+                msg.open()
+            raise err2
+
     def make_gui(self) -> type[kvui.GameManager]:
-        ui = super().make_gui()
-        ui.base_title = "Archipelago Khimera: Destroy All Monster Girls Client"
-        return ui
+        import kvui  # type: ignore
+
+        class KhimeraDAMGManager(kvui.GameManager):
+            base_title = "Archipelago — Khimera: Destroy All Monster Girls Client"
+
+            def on_start(self) -> None:
+                super().on_start()
+                self.ctx._kvui_started = True  # type: ignore
+                Utils.async_start(self.ctx.on_kvui_start())  # type: ignore
+
+        return KhimeraDAMGManager
+
+    async def shutdown(self) -> None:
+        await self._close_communication()
+
+        return await super().shutdown()
 
 
 def launch(*args: str) -> None:
@@ -785,13 +1074,19 @@ def launch(*args: str) -> None:
 
         ctx = KhimeraDAMGContext(parsed_args.connect, parsed_args.password)
         ctx.auth = parsed_args.name
-        ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
+        ctx.server_task = asyncio.create_task(server_loop(ctx), name="kdamg_client_server_loop")
         if gui_enabled:
             ctx.run_gui()
-        ctx.run_cli()
+            ctx.run_cli()
+        else:
+            ctx.run_cli()
+            await ctx.detect_continued_game()
 
-        await ctx.exit_event.wait()
-        await ctx.shutdown()
+        try:
+            await ctx.exit_event.wait()
+        finally:
+            # "finally" runs after a Ctrl + C call.
+            await ctx.shutdown()
 
     Utils.init_logging("KhimeraDAMGClient", exception_logger="Client")
 

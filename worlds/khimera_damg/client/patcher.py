@@ -78,6 +78,8 @@ max_source_data_size = max((build.size for build in builds.values()), default=0)
 max_apworld = max(apworld_to_mod_map.keys(), default=(0, 0, 0))
 min_apworld = (0, 0, 9)  # Update to (0, 1, 0) on the first release, and keep it.
 
+executable_name = "khimera_damg_ap_randomizer.exe"
+
 
 def _make_hash_name(build_name: str, mod_version: tuple[int, int, int] | str) -> str:
     if isinstance(mod_version, tuple):
@@ -351,6 +353,10 @@ def load_patch(apw_version: str) -> None:
         if entry.name == "data.win":
             shutil.copy2(patch, loaded_path / "data.win")
             continue
+        if entry.name == "khimera1.exe":
+            # Rename executable so we have an unique exe name for ourselves.
+            shutil.copy2(entry, loaded_path / executable_name)
+            continue
         shutil.copy2(entry, loaded_path)
 
     source_hash = _hash_multiple_files(loaded_file_paths)
@@ -417,7 +423,7 @@ def source_validate(source_path: Path) -> tuple[bool, str | None]:
 
 
 # Returns all available source builds. An empty return means there are no builds for this version.
-def source_get(apw_version: str, *, build_name: str | None = None) -> list[str]:
+def source_get(apw_version: str, *, build_name: str | None = None, return_any: bool = False) -> list[str]:
     mod_version = _get_mod_version(apw_version)
     build_list = _get_source_map(mod_version).values()
     ret: list[str] = []
@@ -431,6 +437,8 @@ def source_get(apw_version: str, *, build_name: str | None = None) -> list[str]:
         if build_name is not None and build_name != name:
             continue
         ret.append(name)
+        if return_any:
+            return ret
 
     return ret
 

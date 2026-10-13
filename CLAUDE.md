@@ -56,7 +56,7 @@ marked as such (see rule 6).
 - `Archipelago/` — submodule, a fork of Archipelago. Read it freely; never modify it.
 - `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. Same rule: read freely, never modify.
 - `docs/` — design notes: the communication contract, item/location conventions, the option
-  list, the fuzzer runbook, and the future-reference list.
+  list, the fuzzer runbook, the future-reference list, and the known-issues log.
 - `scripts/` — PowerShell tooling, plus one Python generator. `scripts/setup/`,
   `scripts/build/` and `scripts/fuzzer/` hold the steps the top-level scripts call. See
   "Build and test environment".
@@ -152,6 +152,27 @@ as the world version, and selects the communication agent. `world_version` in
 `worlds/khimera_damg/archipelago.json` is what Archipelago reads and shows to players. They are
 separate values with no code keeping them in step, so when they disagree, say so rather than
 assuming either one is authoritative.
+
+### Third-party packages
+
+Prefer packages listed in `Archipelago/requirements.txt`. Those are the ones Archipelago
+commits to shipping, and the only ones whose presence is a promise rather than a side effect.
+
+A package that is present but *not* in that file is an indirect requirement: it arrives because
+something else asked for it. Using one is allowed — sometimes it is the only thing that does
+the job — but say so when it comes up, and name the chain it depends on and what breaks if that
+chain changes. Do not quietly treat an indirect requirement as though it were guaranteed, and
+do not refuse to use one either.
+
+`psutil` is the current example, and the decision on it is already made. It is shipped with
+Archipelago but absent from `requirements.txt`; it reaches the environment through
+`Archipelago/worlds/_sc2common/requirements.txt` asking for `portpicker`, which in turn
+requires psutil. The client uses it anyway, because `Process.create_time()` is what makes
+identifying a launched game process exact and `pymem` — a direct requirement — has no
+equivalent. If an Archipelago release ever ships without psutil, the agreed fallback is to
+check only the pid and the executable name, accepting the rare misidentification that follows.
+This is recorded in full under "Latent" in `docs/Known Issues.md`; read that entry before
+reopening the question.
 
 ## Code style
 
@@ -338,3 +359,28 @@ The todo list focuses on tasks relevant to the current work, while the future re
 intended to store ideas and changes that are not relevant to the current work and would need
 their own pull request. Neither is an exhaustive list of what to do — just things the developer
 thought of while working on something else.
+
+### The known-issues log
+
+`docs/Known Issues.md` records problems that are known and accepted rather than fixed. It is
+not a task list: an entry there is a decision to live with something, so read it before
+re-raising a problem it already covers. Two sections:
+
+- **Live** — happening now; someone running the current code can hit it.
+- **Latent** — not happening now, but a change outside this repository would trigger it. The
+  point of the entry is that the trigger gets recognised when it arrives.
+
+When asked to log an issue, append it to the right section in this shape:
+
+```markdown
+## <Title>: <a small sentence describing the symptom, and how it relates to the cause if known>
+### Cause:
+What causes it, or "Unknown" if it is not known.
+### Description:
+What is actually observed, and — for a latent issue — what the accepted fallback is.
+```
+
+The title line carries both the name and the one-sentence symptom, so it reads on its own in a
+table of contents. Keep the `### Cause:` section before `### Description:`, including when the
+cause is unknown; an entry with no cause section is incomplete rather than concise. When the
+last entry leaves a section empty, say so in a sentence rather than deleting the heading.

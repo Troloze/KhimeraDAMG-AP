@@ -3,6 +3,9 @@ indent-width = 4
 target-version = "py313"
 preview = true
 
+[format]
+quote-style = "double"
+
 [lint]
 select = ["B", "C", "E", "F", "W", "I", "N", "Q", "UP", "RET", "RSE", "RUF", "ISC", "PLC", "PLE", "PLW", "T20", "PERF"]
 extend-unsafe-fixes = [
@@ -25,7 +28,8 @@ ignore = [
     "UP015",  # Explicit is better than implicit, so we'd prefer to keep "r" in open() calls.
     
     # Khimera's
-    "ANN401", # Any exists for a reason and I intend to use it.
-    "RUF067", # It is common practice for __init__ to contain world stuff in archipelago, I do not intend to go against it.
-    "PLC1901", # Author disagrees with this rule, explicit is better than implicit.
+    "ANN401",  # Any exists for a reason and I intend to use it.
+    "RUF067",  # It is common practice for __init__ to contain world stuff in archipelago, I do not intend to go against it.
+    "PLC1901",  # Author disagrees with this rule, explicit is better than implicit.
+    "Q003"  # This keeps changing my strings.
 ] 

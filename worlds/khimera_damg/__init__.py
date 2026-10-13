@@ -14,6 +14,7 @@ from .types import KhimeraDAMGItem, StageIndex
 
 APWORLD_VERSION: str = "0.0.9"
 GAME_ID: str = "khimera_damg"
+GAME_FULL_NAME: str = "Khimera: Destroy All Monster Girls"
 
 
 def client_launch(*args: str) -> None:
@@ -57,7 +58,7 @@ class WebKhimeraDAMG(WebWorld):
 
 
 class KhimeraDAMGWorld(World):
-    game = "Khimera: Destroy All Monster Girls"
+    game = GAME_FULL_NAME
     origin_region_name = "Map"
     required_client_version = (0, 6, 7)
     item_name_to_id: ClassVar[dict[str, int]] = {name: data.item_id for name, data in item_table.items()}

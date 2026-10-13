@@ -29,6 +29,7 @@ class KhimeraDAMGCommunicationInterface:
         self.seed: str | None = None
         self.session_last_ack: int = 0
         self.running = False
+        self.stopped = False
         self.agent: CommunicationAgent | None = None
 
     def send_items(self, items: list[tuple[int, NetworkItem]]) -> None:
@@ -78,13 +79,13 @@ class KhimeraDAMGCommunicationInterface:
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
-    def _resend_connection_context(self) -> None:
-        pckg: tuple[str, Any] = ("req_cctx", True)
+    def send_connection_context(self, cctx: ConnectionContext) -> None:
+        pckg: tuple[str, Any] = ("req_cctx", cctx)
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
-    def _resend_location_information(self) -> None:
-        pckg: tuple[str, Any] = ("req_li", True)
+    def send_location_information(self, li: LocationInformation) -> None:
+        pckg: tuple[str, Any] = ("req_li", li)
         with suppress(queue.ShutDown):
             self._send_queue.put(pckg)
 
@@ -120,11 +121,6 @@ class KhimeraDAMGCommunicationInterface:
                 self._send_queue.shutdown()
                 self._get_queue.shutdown()
 
-    def reconnect(self, connection_context: ConnectionContext) -> None:
-        if self.agent is None:
-            return
-        self.agent.reconnect(connection_context)
-
     def authenticate(self, slot_name: str, seed: str) -> bool:
         """Returns false when the credentials do not match."""
         if self.slot_name is None or self.seed is None:
@@ -137,6 +133,7 @@ class KhimeraDAMGCommunicationInterface:
         if not self.running:
             return
         self.running = False
+        self.stopped = True
         self._send_queue.shutdown()
         # Should stop itself after turning running to false.
         # May keep feeding get_queue after a while if this happens while
@@ -163,6 +160,8 @@ class KhimeraDAMGCommunicationInterface:
         death_ack: int | None = None
         is_win: bool | None = False
         data: list[tuple[int, str, Any]] | None = None
+        req_cctx: bool | None = None
+        req_li: bool | None = None
         for entry in incoming_data:
             if entry[1] is None:
                 continue
@@ -189,9 +188,9 @@ class KhimeraDAMGCommunicationInterface:
             if entry[0] == "is_win":
                 is_win = is_win or entry[1]
             if entry[0] == "req_cctx":
-                self._resend_connection_context()
+                req_cctx = True
             if entry[0] == "req_li":
-                self._resend_location_information()
+                req_li = True
 
         return RuntimeInformation(
             locations=locations,
@@ -200,10 +199,14 @@ class KhimeraDAMGCommunicationInterface:
             death_ack=death_ack,
             data=data,
             ack=self.session_last_ack,
-            is_win=is_win
+            is_win=is_win,
+            req_cctx=req_cctx,
+            req_li=req_li
         )
 
     async def probe_game_status(self, host_world_version: str, timeout: float = 1.0) -> bool:
+        if self.stopped:
+            return False
         agent = self.agent if self.agent is not None else get_agent(host_world_version)()
         # Could raise
         return await agent.on_game_status_update(timeout=timeout)
