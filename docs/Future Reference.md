@@ -12,21 +12,16 @@ These will be implemented eventually.
   - Requires changing region logic to allow sub-regions.
   - If I am going to do that, I'd rather make every single screen a region.
   - For that I will need to make a structured view of all stages in the game, big and time consuming task. 
+
+# Client
+
+### After v0.1.0
+- CLI support.
 - Rework the apworld packages and modules in favour of maintainability.
   - Specifically the client/client.py module is in dire need of splitting.
   - Remove definitions other than `__all__` from all `__init__.py` files as well.
 
-# Client
-- Command for launching the game.
-- Command for restarting internal communication systems.
-- Implement data handling commands
-
 # Launcher
-- Launcher will store the pid, auth information (name, password, room url, port), and host apworld version of the latest successful game launch + connection
-  - This will be used for reconnection when the client is closed but the game stays open.
-  - Launcher will to verify if the pid is still running. 
-  - Then the communication handler will verify the game's heartbeat.
-  - An automatic reconnection attempt will be made.
-Closing the game and opening it again will cause the agent to issue an outdated cctx.
-  - Since the launcher will be the only (expected) way to open the game, a way to update the cctx will be needed.
-  - Perhaps one could repurpose the reconnect function that is already working, and change its name to update_context.
+
+### For future versions, very low priority
+- Detect a copy of the game on the user's steam library and ask to use it before the regular build prompts (both startup and on launch).

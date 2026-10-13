@@ -38,7 +38,11 @@ class KhimeraDAMGStorageHandler:
         path = cls._get_path(file_name, folder)
         if not path.exists():
             return {"id": file_name}
-        data = yaml.safe_load(path.read_text())
+        try:
+            data = yaml.safe_load(path.read_text())
+        except (yaml.YAMLError, TypeError, KeyError):
+            # Complete override, we don't have a better solution though.
+            data = {}
         # We do not want lists here, so, just to be safe, let's drop the data if it is a list.
         if not isinstance(data, dict):
             data = {}

@@ -57,7 +57,7 @@ Rules specific to game maker needed to ensure this contract works as expected.
 # Files
 ## Client Side Files:
 ### Connection Context: `ap.cctx`
-This will list connection information. Will be sent when the client first launches the game, on reconnection, and while the game has not consumed the file yet (tracked via `.csreq`).
+This will list connection information. Will only be sent when the game requests it (tracked via `.gsreq`).
 
 This message will be a json with:
 - `"meta"`: (dict)
@@ -111,7 +111,7 @@ This message will be a json with:
 		- `"is_win"` (optional) holding a 1 (int). Tells the game it has been goaled.
 ### Location Information: `ap.li`
 Information regarding each individual location, including item owner and item classification.
-Will be sent when the client first launches the game, on reconnection, and while the game has not consumed the file yet (tracked via `.csreq`).
+Will only be sent when the game requests it (tracked via `.gsreq`).
 
 This message will be a json with:
 1. `"enabled"` a zero or one value.
