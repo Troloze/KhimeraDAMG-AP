@@ -288,7 +288,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         if not self.ctx.launcher.tracking:
             logger.warning("The client could not detect any instance of the game running.")
             return
-        
+
         async def terminate(ctx: KhimeraDAMGContext) -> None:
             try:
                 await ctx.launcher.terminate()
@@ -654,7 +654,7 @@ class KhimeraDAMGContext(CommonContext):
         req_cctx = self.connection_state.get_req_cctx()
         if req_cctx is not None and self.communication_interface is not None:
             self.communication_interface.send_connection_context(self.cctx)  # type: ignore
-        
+
         req_li = self.connection_state.get_req_li()
         if req_li is not None and self.communication_interface is not None:
             self.communication_interface.send_location_information(self.li)  # type: ignore
