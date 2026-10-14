@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from BaseClasses import Region  # type: ignore
-from rule_builder.rules import Has, Rule, Or  # type: ignore
+from rule_builder.rules import Has, Or, Rule  # type: ignore
 
 from .generation_options import VictoryCondition
 from .types import (

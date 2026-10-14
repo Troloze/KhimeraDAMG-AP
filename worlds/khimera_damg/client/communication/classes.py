@@ -29,7 +29,6 @@ class StopFlag:
                 raise RuntimeError("There was an attempt to set the flag while it is locked.")
         with self._lock:
             self._flag = True
-        
 
     def __enter__(self) -> bool:
         with self._locked_lock:

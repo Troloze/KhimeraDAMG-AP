@@ -196,7 +196,7 @@ class AgentV1(CommunicationAgent):
                 return None
         if self.s_flag.value:
             return None
-        
+
         item_map: dict[int, NetworkItem] | None = {}
         messages: list[tuple[int, str]] | None = []
         location_ids: set[int] | None = set()
