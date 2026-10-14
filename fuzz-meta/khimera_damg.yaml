@@ -5,8 +5,15 @@
 # ionium index itself uses (fuzz-meta/khimera_damg.yaml), so this file can be copied there
 # directly if the index ever needs one.
 #
-# Currently empty: every option in worlds/khimera_damg/generation_options.py is either a
-# single-value Choice (VictoryCondition) or an independent Toggle (the four shuffle_*
-# options), so there are no invalid option combinations to constrain yet. Add
-# fuzz_constraints here (mutually_exclusive, if_selected/must_include, etc. -- see the
-# fuzzer README) once that stops being true.
+# Currently empty: no combination of the options in worlds/khimera_damg/generation_options.py
+# is invalid. They are a single-value Choice (victory_condition), four independent Toggles
+# (the shuffle_* options), a Range (trap_weight), five trap frequency Choices (balls_trap,
+# floof_aviator_swarm_trap, kiran_drive_by_trap, box_trap, random_enemy_trap), death_link and
+# start_inventory_from_pool. A trap_weight above 0 with every trap disabled is still valid: it
+# just places no traps. Add fuzz_constraints here (mutually_exclusive,
+# if_selected/must_include, etc. -- see the fuzzer README) once that stops being true.
+#
+# Not usable with -m yet: a comment-only file loads as None, and the fuzzer crashes on it with
+# "'NoneType' object has no attribute 'get'" before any generation. It needs at least an empty
+# mapping keyed by the game name first. fuzz.py runs from _ignore_/ap-fuzz, so pass this file's
+# absolute path.

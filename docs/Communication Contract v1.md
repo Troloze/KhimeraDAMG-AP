@@ -7,7 +7,7 @@ The client will maintain the logic for older versions of the communication contr
 # Contract Specification.
 The client and the game will communicate via flag files dropped in the game's files.
 ## Relevant locations
-The game will store information per room and seed, currently only the last ack received from the game, but in the future more might come.
+The client will store information per slot and seed: the last item ack received from the game, and the game's persistent data (`game_data`, written from the `ap.gi` `"data"` field and sent back in `ap.cctx`). More might come in the future.
 Stored information will stay in `Utils.user_path("khimera_damg")`.
 
 The file communication will happen at the GameMaker sandbox folder, namely `%LOCALAPPDATA%\khimera_ap`.
@@ -20,6 +20,7 @@ Files will have a `.tmp` attached to the end of their name on creation, and only
 
 Files that are currently being read will have a `.rd` appended by the consumer before reading.
 - If a leftover `.rd` file exists, delete it and try again, the contract is resistant against information loss.
+	- The consumer may instead recover a leftover `.rd` first, reading and applying its contents before deleting it. The client does this; the game deletes.
 
 The existence of the file means that it hasn't been consumed, if the file still exists at the end of a tick, buffer the data and wait for the next tick.
 ## Memory Policy
@@ -134,7 +135,7 @@ This message will be a json with:
 	- `"count"` number of entries
 	- The two lists must have the same length.
 - `"death_link"` a dict with:
-	- `"sender"` the death link sender player id (str)
+	- `"sender"` the death link sender's name, as the host reports it in the death link's `source` (str)
 	- `"death_id"` the death link ids (int)
 		- these are managed by the client, not the host.
 	- `"message"` the death link messages (str)
@@ -196,12 +197,13 @@ This message will be a json with:
 	- All four lists must have the same length.
 
 ### State Flags
-All client state flags will have an extension that starts with `.gs`.
+All game state flags will have an extension that starts with `.gs`.
 - `.gsreq`: Game requires connection information.
 	- bit flag integer
 		- 2 means game has not loaded `ap.cctx` yet
 		- 1 means game has not loaded `ap.li` yet
 	-  If the game hasn't loaded those files yet, but they're gone, the client will need to write them again.
+	- The game also sets the `ap.cctx` bit again whenever it considers the client gone (the client heartbeat is stale or reads as no-data), so a client that comes back is asked for a fresh `ap.cctx`.
 - `.gshb`: Game side heartbeat.
 	- Value goes up by 1 every tick
 - `.gsack`: Game side (item) ack
@@ -219,13 +221,15 @@ All leftover files from previous sessions will be cleaned up by their owners on 
 - Includes state flags.
 - The client will clear up all files on its own on launch if a game is not running.
 # Type treatment specification
-The communication contract specifies 5 types:
+The communication contract specifies 5 value types, plus one marker type:
 - **SV** String Value: a single string. 
 - **NV** Number Value: a single number. 
 - **SL** String List: a list of string values.
 - **NL** Number List: a list of number values.
 - **D** Dictionary: Hosts keys and values. Keys are always strings, values can be string or number.
 	- Value types will need to be inferred.
+- **RM** Remove: only used in the `ap.gi` `"data"` field. The entry has been deleted on the game side, and the client removes the key from its stored `game_data`.
+	- Carries no meaningful value; the game sends 0 and the client ignores it.
 ## Options
 This section will list individual archipelago option types that are intended to be used and how they should be treated.
 ### Choice (NV)

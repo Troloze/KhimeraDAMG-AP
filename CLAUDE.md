@@ -65,18 +65,52 @@ marked as such (see rule 6).
 
 Gitignored working folders, present on a configured clone and never committed: `python/`
 (standalone interpreter), `py-env/` (build venv), `build/` (apworld output), `_ignore_/`
-(fuzzer worktree), `fuzzer/` (fuzzer clone), and `testing/` (scratch tests — this folder is to
-stay gitignored permanently).
+(fuzzer worktree), `fuzzer/` (fuzzer clone), `docs/report/` (landmark review reports, kept
+locally and never committed), and `testing/` (scratch tests — this folder is to stay gitignored
+permanently).
 
 ## Build and test environment
 
 **Testing happens against the installed Archipelago build, not against the `Archipelago/`
-submodule.** The submodule is a source for reading and the host the build runs through; it is
-never modified.
+submodule.** The submodule is a source for reading and the host the build runs through; its
+content is never modified.
 
 **Do not create, edit, or delete anything inside `Archipelago/` or `KhimeraDAMG-AP-Mod/`** — no
-generation output, no build folders, no installed dependencies. Rule 1 applies to both in full.
-The pipeline below is deliberately arranged so that nothing is ever written into either.
+generation output, no build folders, no installed dependencies, unless the exception below
+covers it. Rule 1 applies to both in full. The pipeline below is deliberately arranged so that
+nothing tracked is ever written into either.
+
+**Allowed exception: writes by the Archipelago runtime that leave only ignored changes.** Code
+that ships with Archipelago writes files on its own whenever it runs from source. Those writes
+are allowed as long as every change they leave is ignored by the submodule's own `.gitignore`.
+Known examples, all of which land in `Archipelago/` or in the fuzzer worktree `_ignore_/ap-fuzz`:
+
+- `logs/Launcher_*.txt` and other log files, written by Archipelago's logging setup.
+- `host.yaml`, written by the settings module's autosave whenever settings are loaded.
+- `__pycache__/` folders, written by the Python interpreter Archipelago runs on when modules are
+  imported.
+
+The list is not exhaustive; the test is the result, not the file name. Such a write is never a
+rule 1 violation, a review finding, or a reason to skip an otherwise permitted step such as the
+build, the fuzzer, the core unit tests or static analysis; a review may list it as a side
+effect. The limits:
+
+- **The command still needs its own permission**, under rule 1 or rule 3. The exception only
+  covers what happens once it runs.
+- **A command's intended output is covered only through an explicit permission to run that
+  command.** Explicitly permitting a command means the user expects its output to be produced, so
+  that output is allowed under the same condition, leaving only ignored changes behind. Without
+  that explicit permission, generation output, build folders and installed dependencies stay
+  forbidden inside either submodule even where they would be gitignored.
+- **Only the submodule's own `.gitignore` counts.** An entry in its local `info/exclude` does not
+  make a write acceptable; that file holds only the junction described below.
+- **One named exception to that: `.ruff_cache/`.** If Archipelago itself runs ruff, the
+  `.ruff_cache/` folders ruff creates are allowed, even though they are ignored by the
+  `.gitignore` ruff writes inside each cache folder rather than by the submodule's own. This
+  applies to `.ruff_cache/` only and is not a general rule for tools that ignore their own output.
+- **If `git -C Archipelago status` (or the same in `KhimeraDAMG-AP-Mod`) shows a change after a
+  command**, the write is not covered. Tell the user and leave it as it is; they decide how to
+  handle it.
 
 ### Fresh clone
 
@@ -86,12 +120,16 @@ The pipeline below is deliberately arranged so that nothing is ever written into
 `scripts/setup.ps1` runs the three steps in `scripts/setup/`, in this order:
 
 1. `setup_python.ps1` — installs CPython (3.13.15 by default) into `python/`, per-user and off
-   PATH. Archipelago hard-rejects any interpreter outside 3.11.9–3.13.x.
+   PATH. Archipelago hard-rejects any interpreter outside 3.11.9–3.13.x. The build itself needs
+   3.12 or later, because `scripts/build/prepare_patches.py` uses multi-line replacement fields
+   inside f-strings (PEP 701); setup still accepts 3.11.9, and the build then fails with a
+   `SyntaxError`.
 2. `setup_world_link.ps1` — creates a junction at `Archipelago/worlds/khimera_damg` pointing at
    `worlds/khimera_damg`, and records it in the submodule's local `info/exclude` so it never
    shows up as untracked there. The link is what makes the apworld visible to Archipelago's own
    build component and to static analysis. It is a per-clone artifact, committed to neither
-   repository, and it is the only thing that ever appears inside `Archipelago/`.
+   repository, and it is the only thing this repository's tooling deliberately places inside
+   `Archipelago/` (see the exception above for the files the runtime leaves behind).
 3. `setup_build_env.ps1` — creates a venv at `py-env/` and installs Archipelago's requirements
    into it using the submodule's own `ModuleUpdate.py`. Needs `git` on PATH, because some
    requirements are installed straight from GitHub.
@@ -145,13 +183,26 @@ loads the world with no version or metadata, and from core 0.7.0 on it will refu
 - Building, copying, and generating all write files. Propose the commands and wait to be
   asked, the same as any other change.
 
-### Two places carry a version
+### Four places carry a version
 
 `APWORLD_VERSION` in `worlds/khimera_damg/__init__.py` goes into slot data, reaches the client
 as the world version, and selects the communication agent. `world_version` in
 `worlds/khimera_damg/archipelago.json` is what Archipelago reads and shows to players. They are
 separate values with no code keeping them in step, so when they disagree, say so rather than
 assuming either one is authoritative.
+
+Two more live in `worlds/khimera_damg/client/patcher.py`, and a version bump has to touch them
+too:
+
+- `apworld_to_mod_map` maps each host apworld version to the highest mod version it works with.
+  `max_apworld` is derived from its largest key, so a new `APWORLD_VERSION` with no entry here
+  makes `_get_mod_version` raise "host apworld is too high". The client then cannot launch games
+  for its own version, and start-up fails as soon as it looks up a source build.
+- `min_apworld` is a hand-set floor. Its comment says to set it to `(0, 1, 0)` on the first
+  release and leave it there afterwards.
+
+If the bump also needs a new mod release, that version has to be listed in
+`worlds/khimera_damg/patches/include.txt` as well, or the build will not package its patches.
 
 ### Third-party packages
 
@@ -266,6 +317,9 @@ them as a standing checklist, raise any violation you find, and report index rea
 - **No obvious logic flaws** that make large multiworlds hard to generate. Direct use of the
   global `random` module is called out by name (see the correctness rules above), as are test
   failures "deemed problematic".
+- **The world must pass all core unit tests.** Run Archipelago's own suite with the built
+  `.apworld` in `custom_worlds/` (for example `python -m unittest discover -s test/general` from
+  the fuzzer worktree). A failure there blocks inclusion on its own, separately from the fuzzer.
 - **Generation failure rate below 1%**, measured with Eijebong's fuzzer, not counting
   `OptionError`s. It is measured with `empty-apworld` (<https://github.com/ionium-ap/empty-apworld>,
   100 free locations) present in the same multiworld, so that failures caused by a restrictive
@@ -287,6 +341,20 @@ entry point plus a `hooks/` folder; each check below is one hook in that folder.
 - `check_placement_item_location_references` — `item.location` and `location.item` agree.
 - `detect_output_placement_changes` — a world must not change placements in output/stage steps.
 
+Each hook is written to run on its own, in a separate fuzzer pass. Its `reclassify_outcome` turns
+every outcome it is not testing into a success (or an `OptionError`), so passing several hooks to
+one run masks every failure, and a chained run reports 0 failures whatever the world does.
+`gerpocalypse` also replaces `--with-static-worlds` with a Kingdom Hearts YAML, so the Empty slot
+is dropped from any run it is loaded in. And `detect_output_placement_changes` wraps only
+`generate_output`, so it never fires under `--skip-output`.
+
+A failure rate is only meaningful from a pass with no checking hooks and the Empty world in every
+generation. The fuzzer ships a `with_empty` hook for that (`hooks/with_empty.py`), which leaves
+outcomes untouched: it
+writes an Empty YAML and points `--with-static-worlds` at it. It loads `empty.apworld` from the
+index's container paths, and otherwise relies on the world already being registered, which the
+local setup provides through `custom_worlds/empty.apworld`.
+
 Run at merge time and worth passing, but not counted toward the 1%:
 
 - `determinism` — the same seed with the same YAMLs must produce the same result every run.
@@ -304,9 +372,13 @@ a real `.apworld` through `scripts/build_apworld.ps1` and drops it into that wor
 registered by Archipelago's meta-path finder.
 
 Default invocation, for reference:
-`fuzz.py -r 500 -j 16 -g khimera_damg -n 1` — `-r` generations (mandatory), `-j` parallel
-jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout, `-m` fuzz-meta file,
-`--hook module:class`. Output lands in `_ignore_/ap-fuzz/fuzz_output`.
+`fuzz.py -r 500 -j 16 -g khimera_damg -n 1 --skip-output`, plus `--hook` for all six counted
+hooks, which `run_fuzzer.ps1` always appends. Per the section above, that combined run cannot
+report a failure, so it is not evidence of the 1% rate; `docs/Running the Fuzzer.md` covers how
+to run passes that are. Flags: `-r` generations (mandatory), `-j` parallel jobs, `-g` world
+(repeatable), `-n` YAMLs per generation, `-t` timeout, `-m` fuzz-meta file, `--hook
+module:class`, `--skip-output` stops before `generate_output`. Output lands in
+`_ignore_/ap-fuzz/fuzz_output`.
 
 ### Index entry format, for when 0.1.0 ships
 
@@ -314,12 +386,21 @@ One `index/khimera_damg.toml` in the index repo. `name` must match the game name
 appears in a player YAML. `home` should link to the Discord thread, else the GitHub repo.
 Every key in `[versions]` must be valid semver even if the release itself is not. The preferred
 form is a global `default_url` templated with `{{version}}` plus bare `"0.1.0" = {}` entries,
-which only works if release tags are plain semver — worth deciding before the first tag.
+which only works if release tags are plain semver — worth deciding before the first tag. The
+format also has optional keys (`display_name`, `tags`, `[releases]`,
+`min_ap_version`/`max_ap_version`, `disabled`), and the README says entries under `[versions]`
+must carry no extra keys; check it for the current list when writing the file.
 
 Per-world option constraints keep the fuzzer from rolling invalid combinations. This repository
 keeps its own copy at `fuzz-meta/khimera_damg.yaml` for local runs, passed with the fuzzer's
 `-m` flag. It uses the same path the index expects, so it can be copied across if the index ever
 needs one — but the index's copy is separate, and a change here has to be mirrored there.
+
+The file is currently comments only, so `yaml.safe_load` returns `None` and passing it with `-m`
+crashes the fuzzer (`'NoneType' object has no attribute 'get'`) before any generation. It needs
+at least an empty mapping keyed by the game name before it can be used. `fuzz.py` also runs from
+`_ignore_/ap-fuzz`, so a relative `fuzz-meta/...` path does not resolve there; pass an absolute
+path.
 
 ## Other information
 

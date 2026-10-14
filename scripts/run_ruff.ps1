@@ -5,10 +5,8 @@ param(
 $Root = Split-Path $PSScriptRoot -Parent
 $RuffPath = Join-Path $Root "ruff.toml"
 
-# Updated ruff raises issues on files irrelevant to this PR.
-# Remove this comment before doing the PR.
 
-$Flag = "--no-respect-gitignore"
+$Flag = ""
 if ($Fix) {
     $Flag += "--fix"
 }

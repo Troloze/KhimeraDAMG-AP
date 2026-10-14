@@ -74,10 +74,13 @@ if (-not (Test-Path $OutputDir)) {
 Move-Item $Zip $OutputFile -Force
 Remove-Item $Stage -Recurse -Force
 
-# fuzz.py copies every file in --with-static-worlds into each generation's yaml folder, so this
-# yaml is what guarantees an Empty slot in every multiworld rather than in a random subset of
-# them. That is the condition the index measures the failure rate under: 100 start-accessible
-# locations present, so a failure points at real logic trouble and not at a restrictive start.
+# fuzz.py copies every file in --with-static-worlds into each generation's yaml folder, so passing
+# this folder puts an Empty slot in every multiworld rather than in a random subset of them. That
+# is the condition the index measures the failure rate under: 100 start-accessible locations
+# present, so a failure points at real logic trouble and not at a restrictive start. It only takes
+# effect in a pass without the gerpocalypse hook, which overwrites --with-static-worlds with its
+# own folder; the fuzzer's with_empty hook is the alternative, and also relies on the
+# custom_worlds\empty.apworld built above.
 if (-not (Test-Path $StaticDir)) {
     New-Item -ItemType Directory -Path $StaticDir | Out-Null
 }

@@ -46,8 +46,9 @@ developer what state it is in before a milestone release.
   violation plainly.
 
   These details may have drifted since this skill was written. `CLAUDE.md` and the code are
-  authoritative over this summary. Where they disagree, trust them and note the drift as a
-  documentation finding.
+  authoritative over this whole skill, not only this summary: its permissions, tasks and output
+  rules included. Where they disagree, follow `CLAUDE.md` and note the drift as a documentation
+  finding against this skill.
   </project>
 
   <ground_rules>
@@ -60,9 +61,16 @@ developer what state it is in before a milestone release.
   By invoking this skill, the developer grants explicit permission for the following actions only,
   for the duration of this review:
   - Creating exactly one file: the report described in <output>.
-  - Running `scripts/build_apworld.ps1`. It writes only gitignored build outputs.
+  - Running `scripts/build_apworld.ps1`. It writes gitignored build outputs in this repository,
+    and runs Archipelago's `Launcher.py` from the submodule, which leaves logs, `host.yaml` and
+    `__pycache__/` inside `Archipelago/`.
   - Running `scripts/run_fuzzer.ps1`, including `-Setup` if the fuzzer is not set up yet. It
-    writes only into the gitignored `_ignore_/`, `fuzzer/` and `build/` folders.
+    writes into the gitignored `_ignore_/`, `fuzzer/` and `build/` folders, plus whatever the
+    build step above leaves in `Archipelago/`.
+  - Running Archipelago's core unit tests from the fuzzer worktree `_ignore_/ap-fuzz`, with the
+    freshly built `.apworld` in its `custom_worlds/`, as the index section of `CLAUDE.md`
+    describes. Never run them from `Archipelago/` itself. Running the apworld's own tests, if any
+    exist, is covered the same way by `CLAUDE.md` rule 3.
   - Running `scripts/run_ruff.ps1` or `ruff check --config ruff.toml`, never with `--fix` or
     `-Fix`.
   - Reading `C:\ProgramData\Archipelago\` (the installed build, including `manifest.json` and
@@ -74,9 +82,17 @@ developer what state it is in before a milestone release.
   - Read-only git commands.
 
   Everything else still falls under `CLAUDE.md` rule 1 and is not permitted. That includes
-  `scripts/build_and_replace.ps1`, writing into either submodule, changing git state, editing any
-  existing file, and running generation through the installed build. If a check needs something
-  outside this list, skip it and record it under "Not verified" in the report.
+  `scripts/build_and_replace.ps1`, writing into either submodule yourself, changing git state,
+  editing any existing file, and running generation through the installed build. If a check needs
+  something outside this list, skip it and record it under "Not verified" in the report.
+
+  Files that the Archipelago runtime writes into a submodule while one of the commands above
+  runs fall under the exception in `CLAUDE.md` ("Build and test environment"): they are allowed
+  as long as every change they leave is ignored by the submodule's own `.gitignore`. They are not
+  a violation, not a finding, and not a reason to skip a permitted step. List them as side effects
+  under "Not verified". After the build, the fuzzer and the tests, run `git -C Archipelago status`
+  and `git -C KhimeraDAMG-AP-Mod status`. If either shows a change, it is not covered: leave it
+  as it is, record it in the report, and tell the developer in the chat reply (task 44).
   </permissions>
 
   <guard_hook>
@@ -158,7 +174,10 @@ developer what state it is in before a milestone release.
   </area>
   <area id="A7" name="Repository hygiene">
   Hardcoded absolute paths or usernames anywhere in scope, files that should be gitignored but are
-  not, tracked generated files, stray files, and `.apignore` correctness.
+  not, tracked generated files, stray files, and `.apignore` correctness. Files the Archipelago
+  runtime leaves in a submodule under the `CLAUDE.md` exception are not stray files. That
+  includes `.ruff_cache/` only when Archipelago itself ran ruff; a `.ruff_cache/` from any other
+  run is outside the exception and is reported.
   </area>
   <area id="A8" name="Documentation correctness">
   Everything in `docs/`, `CLAUDE.md`, docstrings and comments must match the current code. Stale
@@ -173,9 +192,12 @@ developer what state it is in before a milestone release.
   it is and why.
   </area>
   <area id="A10" name="Version consistency">
-  Compare `APWORLD_VERSION` in `__init__.py`, `world_version` in `archipelago.json`, the mod
-  versions listed in `patches/include.txt`, the release zips available in the mod submodule, and
-  the version metadata inside the built artifact.
+  Compare `APWORLD_VERSION` in `__init__.py`, `world_version` in `archipelago.json`,
+  `apworld_to_mod_map` and `min_apworld` in `client/patcher.py` (the current `APWORLD_VERSION`
+  must not be above the map's largest key or below the floor), the mod versions listed in
+  `patches/include.txt`, the release zips available in the mod submodule, and the version
+  metadata inside the built artifact. `CLAUDE.md` ("Four places carry a version") is the
+  reference for which of these a version bump has to touch.
   </area>
   <area id="A11" name="Test coverage">
   Which behaviours have tests and which do not. Report gaps as a list, ranked by risk. Do not file
@@ -203,8 +225,10 @@ Every finding carries:
   code but not exercised), or Unsure.
 - Basis: Ran (command, fuzzer, or inspection of the artifact) or Read (code reading only).
 
-Do not report a finding you cannot point to with `path:line`. Merge findings that share a root
-cause into one entry that lists every location.
+Do not report a finding you cannot point to with `path:line`. Merge findings above [Cosmetic]
+that share a root cause into one entry that lists every location. Never merge [Cosmetic]
+findings: each individual issue at each location is its own finding with its own ID, even when
+several share a theme or a cause.
 </evidence>
 
 <method>
@@ -222,7 +246,9 @@ cause into one entry that lists every location.
   accepted issue unless its trigger has arrived or the situation has changed. If it has, say what
   changed.
 - Read the most recent previous report in `docs/report/`, if one exists, and track each of its
-  findings as Resolved, Still open, or Changed.
+  findings above [Cosmetic] as Resolved, Still open, or Changed. [Cosmetic] findings are not
+  tracked between reports: report them only as the repository stands now, without comparing them
+  to any earlier report.
 - Use subagents to parallelise reading and review across areas. Each subagent gets the ground
   rules, the permissions list, its area, the severity and evidence rules, and an instruction to
   return findings with `path:line`. Subagents never write files. You, the lead, verify every
@@ -274,13 +300,24 @@ Phase 2: Exploration and mapping
 Phase 3: Baseline checks (start the fuzzer early, then continue)
 19. Run `scripts/build_apworld.ps1`. Record success or failure and any warnings.
 20. Start the fuzzer in the background, following `docs/Running the Fuzzer.md` (run setup first if
-    needed). Use the invocation the runbook and `CLAUDE.md` describe, with the `fuzz-meta`
-    constraints. If the live rules from Phase 1 require a different setup (for example
-    `empty-apworld` in the multiworld, or particular hooks) and the existing tooling supports it,
-    run that too. If the tooling cannot reproduce the measured setup, record the gap as a
-    finding and the exact difference.
+    needed), through `scripts/run_fuzzer.ps1`. As `CLAUDE.md` explains, that script always loads
+    all six counted hooks in one run, and that combination cannot report a failure, drops the
+    Empty slot, and (under `--skip-output`) never fires `detect_output_placement_changes`. Its
+    result shows only that the build and copy work; never present it as a failure rate.
+    - Pass the `fuzz-meta` constraints only if `fuzz-meta/khimera_damg.yaml` holds a YAML
+      mapping, and pass it by absolute path. While it is comments only, `-m` crashes the fuzzer;
+      skip it and say so instead of reproducing the crash.
+    - The passes that measure what the index measures (one with no checking hooks and the Empty
+      world in every generation, and one per counted hook) need `fuzz.py` run directly, which is
+      not in the permissions. Record the gap under "Not verified" and as a finding, with the exact
+      difference between what ran and what the index measures. If the live rules from Phase 1
+      require anything else the tooling cannot do, record that the same way.
 21. Run ruff with `ruff.toml`. Record the results.
-22. Run any existing tests that can run without writing outside the permitted folders.
+22. Run Archipelago's core unit tests (`python -m unittest discover -s test/general`) from
+    `_ignore_/ap-fuzz` with its venv, after task 20 has copied the fresh `.apworld` into
+    `custom_worlds/`. Run them with `-B` so no bytecode is written. Also run the apworld's own
+    tests, if any exist. Every failure that involves this world counts against the index's "must
+    pass all core unit tests" requirement.
 23. Open the built `.apworld` as a zip, read-only, without extracting it to disk. List its
     contents, read its packaged `archipelago.json`, confirm `patches/data.py` and the patch zips
     are present, and check for anything that should not ship.
@@ -307,23 +344,30 @@ Phase 5: User journeys
     message. Feed what you find into the relevant area's findings.
 
 Phase 6: Index readiness
-36. Collect the fuzzer results. Compute the failure rate as the live rules define it, and list
-    failures by hook and by exception type, with a representative traceback for each.
+36. Collect the fuzzer results. If separate passes ran, compute the failure rate as the live rules
+    define it, and list failures by hook and by exception type, with a representative traceback
+    for each. If only the combined run from task 20 ran, mark the failure rate and every
+    per-hook check Unknown, and say why.
 37. Evaluate every live index requirement as Pass, Fail or Unknown, with the evidence for each.
     Any Fail on a hard requirement is also filed as a [Critical] finding.
 
 Phase 7: Consolidation
 38. Verify every subagent finding yourself. Drop or downgrade what does not hold.
-39. Merge findings that share a root cause. Assign severity, confidence and basis.
-40. Compare against the previous report: mark each old finding as Resolved, Still open or
-    Changed, and tag new findings as New.
+39. Merge findings above [Cosmetic] that share a root cause; keep every [Cosmetic] finding
+    separate (see <evidence>). Assign severity, confidence and basis.
+40. Compare against the previous report: mark each old finding above [Cosmetic] as Resolved,
+    Still open or Changed, and tag new ones as New. Skip [Cosmetic] findings entirely here, old
+    and new: they describe only the current state of the repository.
 41. List everything that was not reviewed or not verified, and why, including anything the guard
-    hook blocked.
+    hook blocked and every file the runtime wrote into a submodule.
+42. Count the findings per area and severity for the area metrics table in <output>. A finding
+    filed under several areas counts once in each of them.
 
 Phase 8: Report
-42. Write the report file as specified in <output>. This is the only file you create.
-43. In chat, reply with only the report path, the counts per severity, the index verdict, and the
-    three most important findings.
+43. Write the report file as specified in <output>. This is the only file you create.
+44. In chat, reply with only the report path, the counts per severity, the index verdict, the
+    three most important findings, and any change that `git status` showed in either submodule
+    (see <permissions>).
 </tasks>
 
 <output>
@@ -346,23 +390,40 @@ Use this structure:
    Unknown, with evidence. Include the fuzzer failure rate and how it was measured. List any
    drift between the live rules and `CLAUDE.md` below the table.
 4. **Baseline results**: build, ruff, tests, fuzzer, and the artifact inspection.
-5. **Findings**, grouped by severity from [Critical] to [Cosmetic]. Each finding has:
+5. **Area metrics**: one table with a row for every area, A1 to A11 in order, even when an area
+   has no findings. Columns: area ID, area name, one column per severity ([Critical], [Major],
+   [Minor], [Possible Issue], [Cosmetic]), the total, and the IDs of the findings in that row.
+   End with a totals row. A finding filed under several areas appears in each of their rows, so
+   the totals row counts distinct findings and says so. A11 files no defects, so its row gives
+   the number of coverage gaps from section 8 instead, marked as such.
+6. **Findings**, grouped by severity from [Critical] to [Cosmetic]. Each finding above
+   [Cosmetic] has:
    - an ID (for example `KR-012`; keep IDs stable with the previous report where the finding
-     carries over), a title, and the area ID(s)
+     carries over, and number new ones after the highest `KR-` ID any earlier report used,
+     including IDs that older reports gave to cosmetic findings), a title, and the area ID(s)
    - its status: New, Still open, or Changed
    - its locations as `path:line`
    - what is wrong, and the concrete scenario in which a user or the generator hits it
    - confidence and basis
    - a suggested direction, in words, without code that reads as a ready-made patch
-6. **Resolved since last report**: the IDs and titles of findings that are now fixed.
-7. **Test coverage gaps**, ranked by risk.
-8. **Not verified**: what was skipped and why.
-9. **Repository map**: the condensed map from Phase 2.
+
+   [Cosmetic] findings go in a single table instead, one row per finding: ID, area, location
+   (`path:line`), and the note. Never group several issues into one row, even when they share a
+   theme, a cause or a file; repeated occurrences of the same issue at different locations get
+   one row each. The table may be long. Cosmetic findings carry no status and are not compared
+   with any earlier report. They use their own ID series, `KC-001`, `KC-002` and so on, restarting
+   at `KC-001` in every report, so they never take or collide with a stable `KR-` ID.
+7. **Resolved since last report**: the IDs and titles of findings above [Cosmetic] that are now
+   fixed.
+8. **Test coverage gaps**, ranked by risk.
+9. **Not verified**: what was skipped and why, including the side effects of permitted steps.
+10. **Repository map**: the condensed map from Phase 2.
 </output>
 
 <constraints>
-- Do not cap the number of findings, but merge duplicates. Do not let [Cosmetic] entries bury the
-  rest. If there are many, summarise them in a table.
+- Do not cap the number of findings. Merge duplicates above [Cosmetic]; list every [Cosmetic]
+  finding individually in its table, however many there are. The table comes last in the
+  findings section, so it does not bury the rest.
 - Do not report something already accepted in `docs/Known Issues.md` unless it has changed.
 - The index rules are this project's own requirements. Report every violation, whether or not
   the code in question was recently touched.

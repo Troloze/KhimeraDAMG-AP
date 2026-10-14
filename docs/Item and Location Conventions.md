@@ -35,8 +35,10 @@ Enemy location names will have the enemy name on the type depending on Enemysani
 - "instance" - `Ragazza Plains: Floof Pirate - Start 2`
 ## Location ID structure: AABBCCCCC
 ### AA - Region Identifier
-- 00: Generic/Misc
-- 01 - 18: Stage specific
+The game's own internal stage index (`StageIndex` in `types.py`), so the numbers follow the game rather than any ordering of ours.
+- 00 - 17: Stage specific, using the game's ids (e.g. 00 is Ragazza Plains, 09 is Ragazza Town). 15 is the credits and is never used.
+- 18: Cakeboy (not tracked by the game's ids)
+- 19: Generic/Misc ("Other")
 ### BB - Type identifier
 - 00: Generic/Misc
 - 01: Stage Clear

@@ -17,6 +17,9 @@ $ApWorldPath = Join-Path $CustomWorldsDir "khimera_damg.apworld"
 $Venv = Join-Path $FuzzRoot ".venv"
 $VenvPython = Join-Path $Venv "Scripts\python.exe"
 
+# The six hooks the index counts toward its 1% budget. Each is meant to run in its own pass: a
+# hook's reclassify_outcome turns every outcome it does not test into a success, so loading all
+# six together masks every failure. See docs\Running the Fuzzer.md.
 $Hooks = @(
     "hooks.gerpocalypse:Hook",
     "hooks.indirect_conditions:Hook",
@@ -49,8 +52,9 @@ if ($Setup) {
     }
 
     # empty-apworld is the 100-free-location world the index measures the failure rate against.
-    # This clones it, builds a loadable .apworld into custom_worlds\, and writes the static-world
-    # yaml that puts an Empty slot in every generation. -Force re-clones, matching the way -Setup
+    # This clones it, builds a loadable .apworld into custom_worlds\, and writes a static-world
+    # yaml for --with-static-worlds. That yaml never reaches a run of this script: gerpocalypse,
+    # always appended below, overwrites --with-static-worlds. -Force re-clones, matching the way -Setup
     # already re-clones the fuzzer itself, so a re-run picks up anything new upstream. It runs last
     # because it verifies the artifact through the venv created just above.
     & $EmptyScript -Force
