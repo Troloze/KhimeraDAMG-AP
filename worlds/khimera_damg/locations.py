@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from BaseClasses import Region  # type: ignore
-from rule_builder.rules import Has, Rule  # type: ignore
+from rule_builder.rules import Has, Rule, Or  # type: ignore
 
 from .generation_options import VictoryCondition
 from .types import (
@@ -158,7 +158,7 @@ books: LocList = [
 
     _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 1, "1 (Gourmet Gal)"),
     _make_loc(StageIndex.FAIRIES_DOMAIN, LocType.BOOK, 2, "2 (The Fairy Queen)",
-              rule=Has("Fairy", count=12)),
+              rule=Or(Has("Fairy", count=12), Has("Ev: Fairy", count=12))),
 
     _make_loc(StageIndex.QUIZ, LocType.BOOK, 1, "1 (Mouthface)"),
 
@@ -253,6 +253,6 @@ def apply_goal_logic(world: "KhimeraDAMGWorld") -> None:
         host, rule = world.get_region(stage_id_to_name[StageIndex.THE_SPIDERS_WEB]), None
 
     if host is not None:
-        host.add_event("Victory", rule=rule, location_type=KhimeraDAMGLocation, item_type=KhimeraDAMGItem)
+        host.add_event("Ev: Victory", rule=rule, location_type=KhimeraDAMGLocation, item_type=KhimeraDAMGItem)
     else:
         raise ValueError("No victory condition has been set.")

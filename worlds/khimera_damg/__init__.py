@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
-from BaseClasses import ItemClassification, Tutorial  # type: ignore
+from BaseClasses import ItemClassification, MultiWorld, Tutorial  # type: ignore
 from worlds.AutoWorld import WebWorld, World  # type: ignore
 from worlds.LauncherComponents import Component, Type, components, icon_paths  # type: ignore
 from worlds.LauncherComponents import launch as launch_component  # type: ignore
@@ -24,11 +24,11 @@ def client_launch(*args: str) -> None:
 
 components.append(
     Component(
-        "Khimera: Destroy All Monster Girls Client",
+        f"{GAME_FULL_NAME} Client",
         func=client_launch,
         component_type=Type.CLIENT,
         icon=GAME_ID,
-        game_name="Khimera: Destroy All Monster Girls",
+        game_name=GAME_FULL_NAME,
         supports_uri=True
     )
 )
@@ -39,7 +39,8 @@ starting_locations = [
     StageIndex.CHELSHIAS_HOUSE,
     StageIndex.FAIRIES_DOMAIN,
     StageIndex.QUIZ,
-    StageIndex.RAGAZZA_PLAINS]
+    StageIndex.RAGAZZA_PLAINS
+]
 
 
 class WebKhimeraDAMG(WebWorld):
@@ -60,7 +61,7 @@ class WebKhimeraDAMG(WebWorld):
 class KhimeraDAMGWorld(World):
     game = GAME_FULL_NAME
     origin_region_name = "Map"
-    required_client_version = (0, 6, 7)
+    required_client_version = (0, 6, 8)
     item_name_to_id: ClassVar[dict[str, int]] = {name: data.item_id for name, data in item_table.items()}
     location_name_to_id: ClassVar[dict[str, int]] = {name: data.location_id for name, data in loc_table.items()}
     item_name_groups = item_groups
@@ -68,9 +69,12 @@ class KhimeraDAMGWorld(World):
     options: KhimeraDAMGOptions  # type: ignore
     web = WebKhimeraDAMG()
 
-    def generate_early(self) -> None:
+    def __init__(self, multiworld: MultiWorld, player: int) -> None:
+        super().__init__(multiworld, player)
         self.starting_locations = starting_locations
         self.progression_overrides: dict[str, ItemClassification] = {}
+
+    def generate_early(self) -> None:
         update_item_classification(self)
         return super().generate_early()
 
@@ -86,7 +90,7 @@ class KhimeraDAMGWorld(World):
         apply_location_rules(self)
 
         # Setting up the win condition.
-        self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
+        self.multiworld.completion_condition[self.player] = lambda state: state.has("Ev: Victory", self.player)
 
         return super().set_rules()
 

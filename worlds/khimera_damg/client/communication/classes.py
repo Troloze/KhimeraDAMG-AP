@@ -14,7 +14,8 @@ logger = logging.getLogger("Client")
 class StopFlag:
     def __init__(self) -> None:
         self._lock: Lock = Lock()
-        self.locked: bool = False
+        self._locked_lock: Lock = Lock()
+        self._locked: bool = False
         self._flag: bool = False
 
     @property
@@ -23,11 +24,17 @@ class StopFlag:
             return self._flag
 
     def set(self) -> None:
+        with self._locked_lock:
+            if self._locked:
+                raise RuntimeError("There was an attempt to set the flag while it is locked.")
         with self._lock:
             self._flag = True
+        
 
     def __enter__(self) -> bool:
-        self._lock.acquire()
+        with self._locked_lock:
+            self._lock.acquire()
+            self._locked = True
         return self._flag
 
     def __exit__(
@@ -36,7 +43,9 @@ class StopFlag:
         _exc_val: BaseException | None,
         _exc_tb: TracebackType | None
     ) -> bool:
-        self._lock.release()
+        with self._locked_lock:
+            self._lock.release()
+            self._locked = False
         return False
 
 

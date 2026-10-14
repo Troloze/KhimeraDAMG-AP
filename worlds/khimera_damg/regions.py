@@ -54,7 +54,7 @@ def assign_locations_to_region(world: "KhimeraDAMGWorld", region: Region, stage:
         locations |= {name: data.location_id for name, data in fairies if data.stage == stage}
     else:
         if world.options.shuffle_books:
-            event_locations |= {name: "Fairy" for name, data in fairies if data.stage == stage}
+            event_locations |= {f"Ev: {name}": "Ev: Fairy" for name, data in fairies if data.stage == stage}
 
     if world.options.shuffle_detonators:
         locations |= {name: data.location_id for name, data in detonators if data.stage == stage}
