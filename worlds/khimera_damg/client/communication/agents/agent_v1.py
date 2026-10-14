@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 from NetUtils import NetworkItem  # type: ignore
 
 from ...types import ConnectionContext, LocationInformation, RuntimeInformation
-from ..classes import CommunicationAgent, CommunicationContract
+from ..classes import CommunicationAgent, CommunicationContract, StopFlag
 
 logger = logging.getLogger("Client")
 
@@ -100,15 +100,17 @@ class AgentV1(CommunicationAgent):
         connection_context: ConnectionContext,
         location_information: LocationInformation,
         htg_q: queue.Queue,
-        gth_q: queue.Queue
+        gth_q: queue.Queue,
+        s_flag: StopFlag
     ) -> None:
         self.htg_q = htg_q  # Host-to-Game Queue (send)
         self.gth_q = gth_q  # Game-to-Host Queue (get)
+        self.s_flag = s_flag  # Stop flag
         with self.context_lock:
             self.connection_context = connection_context
         self.location_information = location_information
-        if htg_q.is_shutdown or gth_q.is_shutdown:
-            raise ValueError("One of the provided queues has been shutdown.")
+        if s_flag.value:
+            raise ValueError("Stop flag is already raised before communication could initialize.")
 
         # Cleanup
         self._on_start()
@@ -147,6 +149,7 @@ class AgentV1(CommunicationAgent):
         self.host_information_buffer = None
         self.htg_q = None
         self.gth_q = None
+        self.s_flag = None
         self.communication_opened = False
         self.communication_closed = False
         self.last_connection_status = 1
@@ -177,19 +180,23 @@ class AgentV1(CommunicationAgent):
                 path.unlink(missing_ok=True)
 
     def _consumer(self, heartbeat: int) -> tuple[RuntimeInformation, tuple[int, int], tuple[bool, bool]] | None:
-        if self.communication_closed or self.htg_q is None or self.htg_q.is_shutdown:
+        if self.communication_closed or self.htg_q is None or self.s_flag is None or self.s_flag.value:
             return None
 
         outgoing_data: list[tuple[str, Any]] = []
 
         while True:
             try:
-                outgoing_data.append(self.htg_q.get_nowait())
+                with self.s_flag as f:
+                    if not f:
+                        outgoing_data.append(self.htg_q.get_nowait())
             except queue.Empty:
                 break
-            except queue.ShutDown:
+            if self.s_flag.value:
                 return None
-
+        if self.s_flag.value:
+            return None
+        
         item_map: dict[int, NetworkItem] | None = {}
         messages: list[tuple[int, str]] | None = []
         location_ids: set[int] | None = set()
@@ -444,7 +451,7 @@ class AgentV1(CommunicationAgent):
             self.host_information_buffer = None
 
     def _send_client_status_heartbeat(self, heartbeat: int) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown:
+        if self.gth_q is None:
             return
 
         params = {
@@ -481,7 +488,7 @@ class AgentV1(CommunicationAgent):
                 file.rename(new_path)
 
     def _send_client_status_connection(self, connected: int) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown:
+        if self.gth_q is None:
             return
 
         params = {
@@ -518,7 +525,7 @@ class AgentV1(CommunicationAgent):
                 file.rename(new_path)
 
     def _receive_game_information(self) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown:
+        if self.gth_q is None:
             return
 
         raw: list[str] = self._read_file("ap.gi")
@@ -611,7 +618,7 @@ class AgentV1(CommunicationAgent):
                 self.gth_q.put(("data", entry))
 
     def _receive_game_status_heartbeat(self) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown:
+        if self.gth_q is None:
             return
 
         path_list = self.sandbox.glob("*.gshb")
@@ -644,7 +651,7 @@ class AgentV1(CommunicationAgent):
         # No writes to the queue, since the client really doesn't need to know this
 
     def _receive_game_status_requirements(self) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+        if self.gth_q is None or not self._is_game_alive():
             return
 
         path_list = self.sandbox.glob("*.gsreq")
@@ -686,7 +693,7 @@ class AgentV1(CommunicationAgent):
             self.gth_q.put(("req_li", True))
 
     def _receive_game_status_ack(self) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+        if self.gth_q is None or not self._is_game_alive():
             return
 
         path_list = self.sandbox.glob("*.gsack")
@@ -722,7 +729,7 @@ class AgentV1(CommunicationAgent):
         self.gth_q.put(("ack", ack))
 
     def _receive_game_status_win(self) -> None:
-        if self.gth_q is None or self.gth_q.is_shutdown or not self._is_game_alive():
+        if self.gth_q is None or not self._is_game_alive():
             return
 
         path_list = self.sandbox.glob("*.gswin")

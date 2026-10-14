@@ -2,11 +2,42 @@ import logging
 import queue
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
+from threading import Lock
+from types import TracebackType
 from typing import Any, ClassVar
 
 from ..types import ConnectionContext, LocationInformation
 
 logger = logging.getLogger("Client")
+
+
+class StopFlag:
+    def __init__(self) -> None:
+        self._lock: Lock = Lock()
+        self.locked: bool = False
+        self._flag: bool = False
+
+    @property
+    def value(self) -> bool:
+        with self._lock:
+            return self._flag
+
+    def set(self) -> None:
+        with self._lock:
+            self._flag = True
+
+    def __enter__(self) -> bool:
+        self._lock.acquire()
+        return self._flag
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: TracebackType | None
+    ) -> bool:
+        self._lock.release()
+        return False
 
 
 # Changes to this class should be exclusively additive, and
@@ -57,7 +88,8 @@ class CommunicationAgent(metaclass=ABCMeta):
         connection_context: ConnectionContext,
         location_information: LocationInformation,
         htg_q: queue.Queue,
-        gth_q: queue.Queue
+        gth_q: queue.Queue,
+        s_flag: StopFlag
     ) -> None:
         pass
 

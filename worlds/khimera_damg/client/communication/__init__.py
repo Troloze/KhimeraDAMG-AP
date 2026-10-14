@@ -3,13 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import queue
-from contextlib import suppress
 from typing import Any
 
 from NetUtils import NetworkItem  # type: ignore
 
 from ..types import ConnectionContext, LocationInformation, RuntimeInformation
-from .classes import CommunicationAgent
+from .classes import CommunicationAgent, StopFlag
 from .contract_storage import get_agent
 
 __all__ = ["KhimeraDAMGCommunicationInterface"]
@@ -24,6 +23,7 @@ class KhimeraDAMGCommunicationInterface:
     def __init__(self) -> None:
         self._send_queue = queue.Queue()
         self._get_queue = queue.Queue()
+        self.stop_flag = StopFlag()
         self.host_world_version: str = ""
         self.slot_name: str | None = None
         self.seed: str | None = None
@@ -38,8 +38,9 @@ class KhimeraDAMGCommunicationInterface:
 
     def send_item(self, item: NetworkItem, order: int) -> None:
         pckg: tuple[str, Any] = ("item", (order, item))
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_locations(self, locations: set[int]) -> None:
         for entry in locations:
@@ -47,23 +48,27 @@ class KhimeraDAMGCommunicationInterface:
 
     def send_location(self, location_id: int) -> None:
         pckg: tuple[str, Any] = ("location", location_id)
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_message(self, sender: int, message: str) -> None:
         pckg: tuple[str, Any] = ("message", (sender, message))
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_death_link(self, sender: str, death_id: int, message: str) -> None:
         pckg: tuple[str, Any] = ("death_link", (sender, death_id, message))
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_death_ack(self, death_id: int) -> None:
         pckg: tuple[str, Any] = ("death_ack", death_id)
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_data_acks(self, data_ids: list[int]) -> None:
         for entry in data_ids:
@@ -71,23 +76,27 @@ class KhimeraDAMGCommunicationInterface:
 
     def send_data_ack(self, data_id: int) -> None:
         pckg: tuple[str, Any] = ("data_ack", data_id)
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_connection_status(self, is_connected: bool) -> None:
         pckg: tuple[str, Any] = ("status", int(is_connected))
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_connection_context(self, cctx: ConnectionContext) -> None:
         pckg: tuple[str, Any] = ("req_cctx", cctx)
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     def send_location_information(self, li: LocationInformation) -> None:
         pckg: tuple[str, Any] = ("req_li", li)
-        with suppress(queue.ShutDown):
-            self._send_queue.put(pckg)
+        with self.stop_flag as f:
+            if not f:
+                self._send_queue.put(pckg)
 
     async def start(
         self,
@@ -106,7 +115,8 @@ class KhimeraDAMGCommunicationInterface:
                 connection_context=connection_context,
                 location_information=location_information,
                 htg_q=self._send_queue,
-                gth_q=self._get_queue
+                gth_q=self._get_queue,
+                s_flag=self.stop_flag
             )
         )
         try:
@@ -118,8 +128,7 @@ class KhimeraDAMGCommunicationInterface:
                 # This interface is permanently stopped, create a new one to try again.
                 self.running = False
                 self.agent.close_communication()
-                self._send_queue.shutdown()
-                self._get_queue.shutdown()
+                self.stop_flag.set()
 
     def authenticate(self, slot_name: str, seed: str) -> bool:
         """Returns false when the credentials do not match."""
@@ -134,7 +143,7 @@ class KhimeraDAMGCommunicationInterface:
             return
         self.running = False
         self.stopped = True
-        self._send_queue.shutdown()
+        self.stop_flag.set()
         # Should stop itself after turning running to false.
         # May keep feeding get_queue after a while if this happens while
         # it reads game information.
@@ -148,11 +157,10 @@ class KhimeraDAMGCommunicationInterface:
 
         while True:
             try:
+                # get_queue doesn't stop.
                 incoming_data.append(self._get_queue.get_nowait())
             except queue.Empty:
                 break
-            except queue.ShutDown:
-                return None
 
         locations: set[int] | None = None
         location_acks: set[int] | None = None
