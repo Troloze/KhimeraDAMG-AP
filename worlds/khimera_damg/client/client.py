@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import threading
 import time
 from copy import deepcopy
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 
 
 def get_game_id(slot: str, seed: str) -> str:
-    return Utils.get_file_safe_name(f"{slot}_{seed}")
+    return hashlib.md5(f"{slot}_{seed}".encode("utf-8")).hexdigest()
 
 
 class KhimeraDAMGJSONToTextParser(JSONtoTextParser):
@@ -142,33 +143,35 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         self.continue_args = None
 
         async def importer(command_processor: KhimeraDAMGCommandProcessor) -> None:
-            file_name = await asyncio.to_thread(
-                Utils.open_filename,
-                "Import game data",
-                [("Khimera DAMG data", [".kdamgdata"])]
-            )
-            game_id = KhimeraDAMGStorageHandler.probe_load(file_name)
-            if game_id is None:
-                logger.warning("Failed to import game data.")
-                return
-            if game_id == "":
-                if KhimeraDAMGStorageHandler.load_data(file_name):
-                    logger.info("Imported game data successfully.")
-                else:
+            try:
+                file_name = await asyncio.to_thread(
+                    Utils.open_filename,
+                    "Import game data",
+                    [("Khimera DAMG data", [".kdamgdata"])]
+                )
+                game_id = KhimeraDAMGStorageHandler.probe_load(file_name)
+                if game_id is None:
                     logger.warning("Failed to import game data.")
-                return
-            if self.ctx.game_id is not None and self.ctx.game_id == game_id:
-                logger.warning("Cannot import data to the currently loaded slot. Close the game and try again.")
-                return
+                    return
+                if game_id == "":
+                    if KhimeraDAMGStorageHandler.load_data(file_name):
+                        logger.info("Imported game data successfully.")
+                    else:
+                        logger.warning("Failed to import game data.")
+                    return
+                if self.ctx.game_id is not None and self.ctx.game_id == game_id:
+                    logger.warning("Cannot import data to the currently loaded slot. Close the game and try again.")
+                    return
 
-            logger.info("There already is a data file for the loaded slot; would you like to overwrite it? "
-                        "This operation is irreversible"
-            )
-            logger.info("Send /confirm in order to import your game data.")
-            command_processor.continue_context = "import"
-            command_processor.continue_time = time.perf_counter()
-            command_processor.continue_args = {"file_name": file_name}
-            command_processor.command_running = False
+                logger.info("There already is a data file for the loaded slot; would you like to overwrite it? "
+                            "This operation is irreversible"
+                )
+                logger.info("Send /confirm in order to import your game data.")
+                command_processor.continue_context = "import"
+                command_processor.continue_time = time.perf_counter()
+                command_processor.continue_args = {"file_name": file_name}
+            finally:
+                command_processor.command_running = False
         self.command_running = True
         Utils.async_start(importer(self))
 
@@ -328,74 +331,74 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             Confirmation command, does nothing on its own.
             Once a dangerous command is issued, you will be asked to use this.
         """
+        def confirm() -> bool:
+            if self.continue_context == "wipe":
+                self.continue_context = "wipe_"
+                self.continue_time = time.perf_counter()
+                has_gid = None
+                if self.continue_args is not None:
+                    has_gid = self.continue_args.get("g_id")
+                logger.info("This will delete all *archipelago related* "
+                            "Khimera: Destroy All Monster Girls game data file in your machine. "
+                            "Are you absolutely sure this is what you want to do?")
+                if has_gid:
+                    logger.info("Note: This will not delete the currently loaded game data.")
+                logger.info("Send /confirm again in order to wipe the game data. (LAST WARNING)")
+                return True
+            elif self.continue_context == "wipe_":
+                # Wipe everything.
+                g_id = None if self.continue_args is None else self.continue_args.get("g_id")
+                KhimeraDAMGStorageHandler.wipe(g_id)
+                if g_id is None:
+                    logger.info("All game data has been deleted.")
+                else:
+                    logger.info("All game data (except the currently loaded) has been deleted.")
+            elif self.continue_context == "reset":
+                if self.continue_args is None or "g_id" not in self.continue_args:
+                    logger.warning("Error: Attempt to execute a reset action without defining import arguments "
+                                "(This is the dev's fault, please notify them)"
+                    )
+                    return False
+                g_id = self.continue_args["g_id"]
+                if KhimeraDAMGStorageHandler.delete_data(g_id):
+                    logger.info("Deleted game data successfully.")
+                else:
+                    logger.warning("Failed to delete game data.")
+                self.continue_context = None
+                self.continue_time = None
+                self.continue_args = None
+            elif self.continue_context == "import":
+                if self.continue_args is None or "file_name" not in self.continue_args:
+                    logger.warning("Error: Attempt to execute an import action without defining import arguments "
+                                "(This is the dev's fault, please notify them)"
+                    )
+                    return False
+                file_name = self.continue_args["file_name"]
+                if KhimeraDAMGStorageHandler.load_data(file_name):
+                    logger.info("Imported game data successfully.")
+                else:
+                    logger.warning("Failed to import game data.")
+            return False
+
         if self.command_running:
             logger.warning("Theres a command being currently executed.")
-            return
-        if self.continue_context is None or self.continue_time is None:
+        elif self.continue_context is None or self.continue_time is None:
             logger.info("Nothing to confirm.")
-            return
-        if self.continue_time < time.perf_counter() - self.continue_timeout:
+        elif self.continue_time < time.perf_counter() - self.continue_timeout:
             logger.info("You took too long to confirm, please try again.")
-            self.continue_time = None
-            self.continue_context = None
-            self.continue_args = None
-            return
-        if self.continue_context == "wipe":
-            self.continue_context = "wipe_"
-            self.continue_time = time.perf_counter()
-            has_gid = None
-            if self.continue_args is not None:
-                has_gid = self.continue_args.get("g_id")
-            logger.info("This will delete all *archipelago related* "
-                        "Khimera: Destroy All Monster Girls game data file in your machine. "
-                        "Are you absolutely sure this is what you want to do?")
-            if has_gid:
-                logger.info("Note: This will not delete the currently loaded game data.")
-            logger.info("Send /confirm again in order to wipe the game data. (LAST WARNING)")
-            return
-        if self.continue_context == "wipe_":
-            # Wipe everything.
-            g_id = None if self.continue_args is None else self.continue_args.get("g_id")
-            KhimeraDAMGStorageHandler.wipe(g_id)
-            if g_id is None:
-                logger.info("All game data has been deleted.")
-            else:
-                logger.info("All game data (except the currently loaded) has been deleted.")
             self.continue_context = None
             self.continue_time = None
             self.continue_args = None
-            return
-        if self.continue_context == "reset":
-            if self.continue_args is None or "g_id" not in self.continue_args:
-                logger.warning("Error: Attempt to execute a reset action without defining import arguments "
-                               "(This is the dev's fault, please notify them)"
-                )
-                return
-            g_id = self.continue_args["g_id"]
-            if KhimeraDAMGStorageHandler.delete_data(g_id):
-                logger.info("Deleted game data successfully.")
-            else:
-                logger.warning("Failed to delete game data.")
-            self.continue_context = None
-            self.continue_time = None
-            self.continue_args = None
-            return
-        if self.continue_context == "import":
-            if self.continue_args is None or "file_name" not in self.continue_args:
-                logger.warning("Error: Attempt to execute an import action without defining import arguments "
-                               "(This is the dev's fault, please notify them)"
-                )
-                return
-            file_name = self.continue_args["file_name"]
-            if KhimeraDAMGStorageHandler.load_data(file_name):
-                logger.info("Imported game data successfully.")
-            else:
-                logger.warning("Failed to import game data.")
-            self.continue_time = None
-            self.continue_context = None
-            self.continue_args = None
-            return
-
+        else:
+            pending = False
+            try:
+                pending = confirm()
+            finally:
+                if not pending:
+                    self.continue_context = None
+                    self.continue_time = None
+                    self.continue_args = None
+        
 
 class KhimeraDAMGConnectionState:
     def __init__(self, ctx: KhimeraDAMGContext) -> None:

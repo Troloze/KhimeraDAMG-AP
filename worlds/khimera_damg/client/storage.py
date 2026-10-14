@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -15,23 +16,42 @@ from .. import GAME_ID
 class KhimeraDAMGStorageHandler:
     @staticmethod
     def _get_path(file_name: str | None, folder: str | None) -> Path:
-        path = Path(Utils.user_path(GAME_ID))
+        base_path = Path(Utils.user_path(GAME_ID)).resolve()
+        folder_path = base_path
         if folder is not None and folder != "":
-            path /= folder
-        if not path.exists():
-            path.mkdir(parents=True)
+            folder_path = (folder_path / folder).resolve()
+            if not folder_path.is_relative_to(base_path):
+                raise ValueError(
+                    f"Invalid folder name would've caused a write outside of the designated folder. \"{folder}\""
+                )
+        if not folder_path.exists():
+            folder_path.mkdir(parents=True)
         file_name_formatted = f"{file_name}.yaml"
-        return path / file_name_formatted
+        return_path = (folder_path / file_name_formatted).resolve()
+        if not return_path.is_relative_to(base_path):
+            raise ValueError(
+                f"Invalid file name would've caused a write outside of the designated folder: \"{file_name}\""
+            )
+        return return_path
 
     @staticmethod
     def get_path_raw(file_name: str | None = None, folder: str | None = None, *, skip_mkdir: bool = False) -> Path:
-        path = Path(Utils.user_path(GAME_ID))
+        base_path = Path(Utils.user_path(GAME_ID)).resolve()
+        folder_path = base_path
         if folder is not None and folder != "":
-            path /= folder
-        if not path.exists() and not skip_mkdir:
-            path.mkdir(parents=True)
-
-        return path if file_name is None else path / file_name
+            folder_path = (folder_path / folder).resolve()
+            if not folder_path.is_relative_to(base_path):
+                raise ValueError(
+                    f"Invalid folder name would've caused a write outside of the designated folder. \"{folder}\""
+                )
+        if not folder_path.exists() and not skip_mkdir:
+            folder_path.mkdir(parents=True)
+        return_path = (folder_path if file_name is None else folder_path / file_name).resolve()
+        if not return_path.is_relative_to(base_path):
+            raise ValueError(
+                f"Invalid file name would've caused a write outside of the designated folder: \"{file_name}\""
+            )
+        return return_path
 
     @classmethod
     def _get_data(cls, file_name: str, folder: str | None) -> Any:
@@ -101,16 +121,19 @@ class KhimeraDAMGStorageHandler:
 
     @classmethod
     def probe_load(cls, file_name: str | None) -> str | None:
-        if file_name is None:
+        if file_name is None or file_name == "":
             return None
         game_id: str | None = None
         with open(file_name, "r", encoding="utf-8-sig") as f:
             try:
                 data: dict = yaml.safe_load(f.read())
                 game_id = data["id"]
-            except (yaml.YAMLError, TypeError, KeyError):
+            except (yaml.YAMLError, TypeError, KeyError, UnicodeDecodeError):
                 return None
         if game_id is None:
+            return None
+        if not isinstance(game_id, str) or re.fullmatch(r"^[0-9a-f]{32}$", game_id) is None:
+            # Invalid game id
             return None
         data_path = cls._get_path(game_id, "game_data")
         return game_id if data_path.exists() else ""
@@ -118,16 +141,19 @@ class KhimeraDAMGStorageHandler:
     @classmethod
     def load_data(cls, file_name: str | None) -> bool:
         """Destructive! Handle with care."""
-        if file_name is None:
+        if file_name is None or file_name == "":
             return False
         game_id: str | None = None
         with open(file_name, "r", encoding="utf-8-sig") as f:
             try:
                 data: dict = yaml.safe_load(f.read())
                 game_id = data["id"]
-            except (yaml.YAMLError, TypeError, KeyError):
+            except (yaml.YAMLError, TypeError, KeyError, UnicodeDecodeError):
                 return False
         if game_id is None:
+            return False
+        if not isinstance(game_id, str) or re.fullmatch(r"^[0-9a-f]{32}$", game_id) is None:
+            # Invalid game id
             return False
         data_path = cls._get_path(game_id, "game_data")
         if data_path.exists():
