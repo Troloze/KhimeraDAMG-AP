@@ -8,9 +8,9 @@ $RuffPath = Join-Path $Root "ruff.toml"
 # Updated ruff raises issues on files irrelevant to this PR.
 # Remove this comment before doing the PR.
 
-$Flag = ""
+$Flag = "--no-respect-gitignore"
 if ($Fix) {
-    $Flag = "--fix"
+    $Flag += "--fix"
 }
 
 # Anchored to $Root so the script works from any working directory, the same way $RuffPath is.
