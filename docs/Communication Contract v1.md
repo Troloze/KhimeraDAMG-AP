@@ -6,6 +6,11 @@ Compatibility breaking changes will be written to a new document and stored as `
 The client will maintain the logic for older versions of the communication contract, using it when necessary.
 # Contract Specification.
 The client and the game will communicate via flag files dropped in the game's files.
+## Launch
+Whenever the client launches the game, it will pass an unique id via the `--launcher_uid` command option.
+The uid value needs to be a non-negative integer, and the game will not run if `--launcher_uid` is not provided.
+
+The command will look like: `example/path/to/game/executable.exe --launcher_uid=12345`. 
 ## Relevant locations
 The client will store information per slot and seed: the last item ack received from the game, and the game's persistent data (`game_data`, written from the `ap.gi` `"data"` field and sent back in `ap.cctx`). More might come in the future.
 Stored information will stay in `Utils.user_path("khimera_damg")`.
