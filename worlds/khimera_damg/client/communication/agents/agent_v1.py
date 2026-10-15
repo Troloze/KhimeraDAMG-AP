@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 import os
 import queue
@@ -25,20 +26,19 @@ class AgentV1(CommunicationAgent):
     _cleanup_target_files: ClassVar[list[str]] = [
         "ap.cctx",
         "ap.cctx.tmp",
-        "ap.cctx.rd",
         "ap.li",
         "ap.li.tmp",
-        "ap.li.rd",
         "ap.hi",
         "ap.hi.tmp",
-        "ap.hi.rd",
-        "ap.gi",
-        "ap.gi.tmp",
         "ap.gi.rd",
     ]
 
-    _shutdown_cleanup_exclude: ClassVar[list[str]] = [
-        "ap.gi.tmp"  # Not included since game produced tmp files should be invisible to the client
+    _game_owned_files: ClassVar[list[str]] = [
+        "ap.cctx.rd",
+        "ap.li.rd",
+        "ap.hi.rd",
+        "ap.gi",
+        "ap.gi.tmp"
     ]
 
     _max_heartbeat_timeout: ClassVar[float] = 2.5
@@ -101,7 +101,8 @@ class AgentV1(CommunicationAgent):
         location_information: LocationInformation,
         htg_q: queue.Queue,
         gth_q: queue.Queue,
-        s_flag: StopFlag
+        s_flag: StopFlag,
+        is_game_running: bool
     ) -> None:
         self.htg_q = htg_q  # Host-to-Game Queue (send)
         self.gth_q = gth_q  # Game-to-Host Queue (get)
@@ -113,7 +114,7 @@ class AgentV1(CommunicationAgent):
             raise ValueError("Stop flag is already raised before communication could initialize.")
 
         # Cleanup
-        self._on_start()
+        self._on_start(is_game_running)
 
         # No need to error handle these, the .gsreq flag works to cover
         # for errors here.
@@ -159,18 +160,23 @@ class AgentV1(CommunicationAgent):
         self.thread_exit = threading.Event()
         self.context_lock: threading.Lock = threading.Lock()
 
-    def _on_start(self) -> None:
-        for file in self._cleanup_target_files:
+    def _on_start(self, is_game_running: bool) -> None:
+        files = self._cleanup_target_files + (self._game_owned_files if not is_game_running else [])
+        for file in files:
             file_path = self.sandbox / file
             with suppress(OSError):
                 file_path.unlink(missing_ok=True)
-        paths = self.sandbox.glob("*.cs*")
+        paths = itertools.chain(
+            self.sandbox.glob("*.cs*"),
+            self.sandbox.glob("*.gs*") if not is_game_running else iter(())
+        )
+
         for path in paths:
             with suppress(OSError):
                 path.unlink(missing_ok=True)
 
     def _on_exit(self) -> None:
-        for file in [entry for entry in self._cleanup_target_files if entry not in self._shutdown_cleanup_exclude]:
+        for file in self._cleanup_target_files:
             file_path = self.sandbox / file
             with suppress(OSError):
                 file_path.unlink(missing_ok=True)

@@ -97,7 +97,8 @@ class CommunicationAgent(metaclass=ABCMeta):
         location_information: LocationInformation,
         htg_q: queue.Queue,
         gth_q: queue.Queue,
-        s_flag: StopFlag
+        s_flag: StopFlag,
+        is_game_running: bool
     ) -> None:
         pass
 

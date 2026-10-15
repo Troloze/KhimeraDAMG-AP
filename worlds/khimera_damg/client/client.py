@@ -805,7 +805,7 @@ class KhimeraDAMGContext(CommonContext):
 
         self.communication_interface = KhimeraDAMGCommunicationInterface()
         try:
-            await self.communication_interface.start(self.cctx, self.li)
+            await self.communication_interface.start(self.cctx, self.li, self.launcher.tracking)
         except OSError as err:
             # Not caught as the new type, but useful to differentiate between the storage OSErrors when debugging.
             raise self.FailedToStartCommunicationError(f"Could not start communication: {err}") from err

@@ -101,7 +101,8 @@ class KhimeraDAMGCommunicationInterface:
     async def start(
         self,
         connection_context: ConnectionContext,
-        location_information: LocationInformation
+        location_information: LocationInformation,
+        is_game_running: bool
     ) -> None:
         if self.running:
             return
@@ -124,7 +125,8 @@ class KhimeraDAMGCommunicationInterface:
                 location_information=location_information,
                 htg_q=self._send_queue,
                 gth_q=self._get_queue,
-                s_flag=self.stop_flag
+                s_flag=self.stop_flag,
+                is_game_running=is_game_running
             )
         )
         try:
