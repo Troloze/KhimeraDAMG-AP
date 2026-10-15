@@ -16,8 +16,8 @@ if (-not (Test-Path $WorldSource)) {
     exit 1
 }
 if (-not (Test-Path $ApWorldsDir)) {
-    Write-Error "Archipelago submodule not checked out: $ApWorldsDir is missing. " +
-                "Run git submodule update --init --recursive first."
+    Write-Error ("Archipelago is not set up: $ApWorldsDir is missing. " +
+                 "Run scripts\setup\setup_archipelago.ps1 first.")
     exit 1
 }
 
@@ -27,8 +27,8 @@ if (-not (Test-Path $ApWorldsDir)) {
 $Existing = Get-Item $LinkPath -Force -ErrorAction SilentlyContinue
 if ($Existing) {
     if (-not $Existing.LinkType) {
-        Write-Error "$LinkPath exists and is not a link. Remove it by hand; this script will " +
-                    "not delete real files inside the submodule."
+        Write-Error ("$LinkPath exists and is not a link. Remove it by hand, or run " +
+                     "scripts\restore_archipelago.ps1; this script will not delete real files.")
         exit 1
     }
     if (-not $Force) {
@@ -51,12 +51,19 @@ if (-not $Existing) {
     Write-Host "Created world link $LinkPath -> $WorldSource"
 }
 
-# The link is a per-clone artifact. It cannot be committed to the submodule (that is a fork of
-# Archipelago and off limits), and left alone it shows up as untracked there forever. info\exclude
-# is the right home: it behaves like .gitignore but is local to the clone and never pushed.
+# The link is a per-clone artifact, and left alone it shows up as untracked in the Archipelago
+# clone forever. info\exclude is the right home: it behaves like .gitignore but is local to the
+# clone and survives restore_archipelago.ps1, which never touches .git.
 $GitDir = & git -C $ApRoot rev-parse --absolute-git-dir
 if ($LASTEXITCODE -ne 0 -or -not $GitDir) {
-    Write-Error "Could not resolve the Archipelago submodule's git directory."
+    Write-Error "Could not resolve the Archipelago clone's git directory."
+    exit 1
+}
+# Without a .git of its own, git -C resolves this repository's instead, and the entry would land
+# in the wrong exclude file.
+$ExpectedGitDir = [System.IO.Path]::GetFullPath((Join-Path $ApRoot ".git"))
+if ([System.IO.Path]::GetFullPath($GitDir.Trim()) -ne $ExpectedGitDir) {
+    Write-Error "$ApRoot is not a git clone of its own. Run scripts\restore_archipelago.ps1."
     exit 1
 }
 
@@ -88,3 +95,5 @@ else {
     [System.IO.File]::AppendAllText($ExcludeFile, $Payload, $Utf8NoBom)
     Write-Host "Added '$ExcludeEntry' to $ExcludeFile"
 }
+
+exit 0

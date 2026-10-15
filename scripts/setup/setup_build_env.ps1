@@ -21,7 +21,7 @@ if (-not (Test-Path $PythonExe)) {
     exit 1
 }
 if (-not (Test-Path $ModuleUpdate)) {
-    Write-Error "Archipelago submodule not checked out: $ModuleUpdate is missing."
+    Write-Error "Archipelago is not set up: $ModuleUpdate is missing. Run scripts\setup\setup_archipelago.ps1 first."
     exit 1
 }
 

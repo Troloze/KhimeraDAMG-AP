@@ -1,0 +1,335 @@
+# AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.
+
+# Helpers shared by the scripts that manage the two folders this repository downloads from GitHub
+# instead of tracking: Archipelago\ and KhimeraDAMG-AP-Mod\. Dot-source it; it only defines
+# functions, and they report failure by throwing.
+#
+# Each folder is a depth-1 clone, ignored by the root .gitignore and meant to be disposable:
+# anything may write into it, and restore_<folder>.ps1 puts it back. The commit a folder was set
+# up at is recorded inside the clone as refs/kdamg/pinned, which is what a restore returns to. The
+# ref sits outside refs/heads and refs/tags so nothing done inside the clone moves it by accident.
+
+$PinnedRef = "refs/kdamg/pinned"
+
+function Invoke-Git {
+    # Runs git and throws $Failure on a non-zero exit. Output goes to the host so that it never
+    # becomes part of a caller's return value.
+    param(
+        [string[]] $Arguments,
+        [string] $Failure
+    )
+
+    & git @Arguments | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw $Failure
+    }
+}
+
+function Get-TagCommit {
+    # Finds a tag in git ls-remote --tags output and returns the commit it points at, or $null.
+    # An annotated tag is listed twice, the second time suffixed ^{} with the commit it peels to,
+    # and that one wins.
+    param(
+        [string[]] $Lines,
+        [string] $Name
+    )
+
+    $commit = $null
+    foreach ($line in $Lines) {
+        $fields = $line -split "`t"
+        if ($fields.Count -lt 2) {
+            continue
+        }
+        if ($fields[1] -eq "refs/tags/$($Name)^{}") {
+            return $fields[0]
+        }
+        if ($fields[1] -eq "refs/tags/$Name") {
+            $commit = $fields[0]
+        }
+    }
+    return $commit
+}
+
+function Resolve-RemoteTarget {
+    # Turns a -Tag value into the remote ref to fetch:
+    #   ""        the remote's default branch, at its newest commit
+    #   "latest"  the highest tag in version order
+    #   anything  that exact tag; one that does not exist is an error
+    # Returns @{ Ref; LocalRef; Commit; Label }, where Commit is what the remote reports right now.
+    param(
+        [string] $Url,
+        [string] $Tag
+    )
+
+    if ($Tag -eq "") {
+        $lines = @(git ls-remote --symref $Url HEAD)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not reach $Url (git ls-remote failed)."
+        }
+        $branchRef = $null
+        $commit = $null
+        foreach ($line in $lines) {
+            if ($line -match '^ref: (refs/heads/\S+)\tHEAD$') {
+                $branchRef = $Matches[1]
+            }
+            elseif ($line -match '^([0-9a-f]{40,64})\tHEAD$') {
+                $commit = $Matches[1]
+            }
+        }
+        if (-not $branchRef -or -not $commit) {
+            throw "Could not work out the default branch of $Url."
+        }
+        $branch = $branchRef.Substring("refs/heads/".Length)
+        return @{
+            Ref = $branchRef
+            LocalRef = "refs/remotes/origin/$branch"
+            Commit = $commit
+            Label = "$branch (latest commit)"
+        }
+    }
+
+    if ($Tag -eq "latest") {
+        # versionsort.suffix=- sorts 0.6.8-rc1 before 0.6.8, so a release outranks its own release
+        # candidates. A release candidate for a newer version still outranks an older release.
+        $lines = @(git -c versionsort.suffix=- ls-remote --tags --sort=-v:refname $Url)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not reach $Url (git ls-remote failed)."
+        }
+        $name = $null
+        foreach ($line in $lines) {
+            $ref = ($line -split "`t")[1]
+            if ($ref -and -not $ref.EndsWith("^{}")) {
+                $name = $ref.Substring("refs/tags/".Length)
+                break
+            }
+        }
+        if (-not $name) {
+            throw "$Url has no tags, so there is no latest tag to use."
+        }
+        $label = "tag $name (latest)"
+    }
+    else {
+        $name = $Tag
+        $lines = @(git ls-remote --tags $Url "refs/tags/$Tag")
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not reach $Url (git ls-remote failed)."
+        }
+        $label = "tag $name"
+    }
+
+    $commit = Get-TagCommit -Lines $lines -Name $name
+    if (-not $commit) {
+        throw "Tag '$name' does not exist in $Url."
+    }
+    return @{
+        Ref = "refs/tags/$name"
+        LocalRef = "refs/tags/$name"
+        Commit = $commit
+        Label = $label
+    }
+}
+
+function Remove-LinksInside {
+    # Deletes every junction and directory symlink below $Path without following it. Remove-Item
+    # on Windows PowerShell has a history of recursing into a junction's target, and the world link
+    # inside Archipelago points at worlds\khimera_damg in this repository, so the links have to go
+    # before anything deletes or cleans the tree around them. DirectoryInfo.Delete() on a reparse
+    # point removes only the link.
+    param(
+        [string] $Path
+    )
+
+    foreach ($dir in ([System.IO.DirectoryInfo] $Path).GetDirectories()) {
+        if ($dir.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+            $dir.Delete()
+        }
+        else {
+            Remove-LinksInside $dir.FullName
+        }
+    }
+}
+
+function Remove-Folder {
+    param(
+        [string] $Path
+    )
+
+    Remove-LinksInside $Path
+    try {
+        Remove-Item $Path -Recurse -Force -ErrorAction Stop
+    }
+    catch {
+        throw ("Could not delete $Path ($($_.Exception.Message)). Something has it open, often a " +
+               "terminal whose working directory is inside it.")
+    }
+}
+
+function Get-PinnedCommit {
+    # The commit $Path was set up at, or $null when $Path is not a clone this tooling made. The
+    # top-level check matters: without a .git of its own, git -C would quietly run against this
+    # repository instead.
+    param(
+        [string] $Path
+    )
+
+    if (-not (Test-Path (Join-Path $Path ".git"))) {
+        return $null
+    }
+    $top = git -C $Path rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $top) {
+        return $null
+    }
+    $expected = [System.IO.Path]::GetFullPath($Path).TrimEnd("\")
+    if ([System.IO.Path]::GetFullPath($top.Trim()).TrimEnd("\") -ne $expected) {
+        return $null
+    }
+    $commit = git -C $Path rev-parse --verify --quiet "$($PinnedRef)^{commit}"
+    if ($LASTEXITCODE -ne 0 -or -not $commit) {
+        return $null
+    }
+    return $commit.Trim()
+}
+
+function Install-Repository {
+    # Makes $Path a depth-1 clone of $Url at $Ref, checked out detached, and pins that commit.
+    # With $LocalRef the fetched ref is also kept under that name, so a tag stays a tag inside the
+    # clone; without it, $Ref may be a bare commit id. $Path must not exist. Returns the commit.
+    param(
+        [string] $Url,
+        [string] $Path,
+        [string] $Ref,
+        [string] $LocalRef = ""
+    )
+
+    if (Test-Path $Path) {
+        throw "$Path already exists."
+    }
+
+    $refspec = $Ref
+    if ($LocalRef) {
+        $refspec = "+$($Ref):$LocalRef"
+    }
+
+    try {
+        Invoke-Git -Arguments @("init", "--quiet", "--initial-branch=main", $Path) `
+            -Failure "git init failed for $Path."
+        Invoke-Git -Arguments @("-C", $Path, "remote", "add", "origin", $Url) `
+            -Failure "Could not add the remote to $Path."
+        Invoke-Git -Arguments @("-C", $Path, "fetch", "--depth", "1", "--no-tags", "origin", $refspec) `
+            -Failure "Fetching $Ref from $Url failed."
+
+        $commit = git -C $Path rev-parse --verify --quiet "FETCH_HEAD^{commit}"
+        if ($LASTEXITCODE -ne 0 -or -not $commit) {
+            throw "Could not read the fetched commit in $Path."
+        }
+        $commit = $commit.Trim()
+
+        Invoke-Git -Arguments @("-C", $Path, "update-ref", $PinnedRef, $commit) `
+            -Failure "Could not record the pinned commit in $Path."
+        Invoke-Git -Arguments @("-C", $Path, "-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", $commit) `
+            -Failure "Checking out $commit in $Path failed."
+    }
+    catch {
+        # A half-made clone is worth nothing, and would only fail the next run's checks.
+        if (Test-Path $Path) {
+            Remove-Folder $Path
+        }
+        throw
+    }
+    return $commit
+}
+
+function Invoke-RepositorySetup {
+    # The body of setup_<folder>.ps1. A folder that is already set up is left alone even when $Tag
+    # now resolves to another commit: it may hold work in progress, so only -Force replaces it.
+    param(
+        [string] $Name,
+        [string] $Url,
+        [string] $Path,
+        [string] $Tag,
+        [switch] $Force
+    )
+
+    if ((Test-Path $Path) -and -not $Force) {
+        $pinned = Get-PinnedCommit $Path
+        if (-not $pinned) {
+            throw "$Path exists but is not a clone made by this setup. Rerun with -Force to replace it."
+        }
+        try {
+            $target = Resolve-RemoteTarget -Url $Url -Tag $Tag
+        }
+        catch {
+            Write-Warning "$Name is set up at $pinned; it could not be compared with $Url. $($_.Exception.Message)"
+            return
+        }
+        if ($target.Commit -eq $pinned) {
+            Write-Host "$Name already set up at $pinned, $($target.Label)."
+        }
+        else {
+            Write-Warning ("$Name is set up at $pinned, but $($target.Label) is now $($target.Commit). " +
+                           "Rerun with -Force to replace the folder with it.")
+        }
+        return
+    }
+
+    # Resolved before anything is deleted, so a mistyped tag leaves the existing folder in place.
+    $target = Resolve-RemoteTarget -Url $Url -Tag $Tag
+    if (Test-Path $Path) {
+        Write-Host "Deleting the existing $Path"
+        Remove-Folder $Path
+    }
+    Write-Host "Cloning $Name, $($target.Label), from $Url"
+    $commit = Install-Repository -Url $Url -Path $Path -Ref $target.Ref -LocalRef $target.LocalRef
+    Write-Host "$Name set up at $commit in $Path"
+}
+
+function Invoke-RepositoryRestore {
+    # The body of restore_<folder>.ps1. Puts $Path back to the commit it was set up at: every
+    # tracked file as committed, and everything else deleted, ignored files included. When that
+    # cannot be done in place, or -Reclone asks for it, the folder is deleted and that same commit
+    # downloaded again. Returns $false when there is nothing to restore from (no folder, no usable
+    # clone in it, or the download failed); the caller then falls back to a fresh setup.
+    param(
+        [string] $Name,
+        [string] $Path,
+        [switch] $Reclone
+    )
+
+    $pinned = Get-PinnedCommit $Path
+    if (-not $pinned) {
+        return $false
+    }
+
+    if (-not $Reclone) {
+        try {
+            Remove-LinksInside $Path
+            Invoke-Git -Arguments @("-C", $Path, "-c", "advice.detachedHead=false", "checkout", "--force", "--quiet",
+                                    "--detach", $pinned) `
+                -Failure "Checking out $pinned in $Path failed."
+            # -ff also removes nested repositories, and -x ignored files: logs, host.yaml, __pycache__.
+            Invoke-Git -Arguments @("-C", $Path, "clean", "-ffdxq") -Failure "git clean failed in $Path."
+            Write-Host "$Name restored in place to $pinned"
+            return $true
+        }
+        catch {
+            Write-Warning "Restoring $Name in place failed: $($_.Exception.Message) Downloading it again."
+        }
+    }
+
+    $url = git -C $Path config --get remote.origin.url
+    if ($LASTEXITCODE -ne 0 -or -not $url) {
+        return $false
+    }
+
+    Write-Host "Deleting $Path and downloading $pinned again"
+    Remove-Folder $Path
+    try {
+        Install-Repository -Url $url.Trim() -Path $Path -Ref $pinned | Out-Null
+    }
+    catch {
+        Write-Warning "Downloading $pinned again failed: $($_.Exception.Message)"
+        return $false
+    }
+    Write-Host "$Name restored to $pinned"
+    return $true
+}

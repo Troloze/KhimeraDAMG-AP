@@ -2,18 +2,32 @@
 
 param(
     [string] $PythonVersion = "3.13.15",
+    [string] $ArchipelagoTag,
+    [string] $ModTag,
     [switch] $Force
 )
 
 $SetupDir = Join-Path $PSScriptRoot "setup"
 
-# Order matters. setup_world_link only needs the submodule and fails in a second, so it runs
-# before setup_build_env, which downloads a few hundred megabytes; setup_build_env in turn
-# consumes the interpreter setup_python installs.
+# The default tags live in each folder's own script. A tag is forwarded only when it was given,
+# so an explicit -ModTag "" still means "latest commit" rather than "use the default".
+$ArchipelagoArgs = @{}
+if ($PSBoundParameters.ContainsKey("ArchipelagoTag")) {
+    $ArchipelagoArgs["Tag"] = $ArchipelagoTag
+}
+$ModArgs = @{}
+if ($PSBoundParameters.ContainsKey("ModTag")) {
+    $ModArgs["Tag"] = $ModTag
+}
+
+# Order matters. setup_build_env installs Archipelago's requirements from the Archipelago clone,
+# using the interpreter setup_python installs, so it runs last. The Archipelago step also creates
+# the world link inside the clone.
 $Steps = @(
-    @{ Name = "Python interpreter"; Script = "setup_python.ps1";     Args = @{ Version = $PythonVersion } },
-    @{ Name = "World link";         Script = "setup_world_link.ps1"; Args = @{} },
-    @{ Name = "Build environment";  Script = "setup_build_env.ps1";  Args = @{} }
+    @{ Name = "Python interpreter"; Script = "setup_python.ps1";      Args = @{ Version = $PythonVersion } },
+    @{ Name = "Archipelago";        Script = "setup_archipelago.ps1"; Args = $ArchipelagoArgs },
+    @{ Name = "Game mod";           Script = "setup_mod.ps1";         Args = $ModArgs },
+    @{ Name = "Build environment";  Script = "setup_build_env.ps1";   Args = @{} }
 )
 
 $Step = 0
