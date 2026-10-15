@@ -405,23 +405,21 @@ class ContractV1(CommunicationContract):
         if loc_info is not None:
             for location, (classification, player) in loc_info.items():
                 try:
-                    validate_int_non_negative(int(location))
-                    validate_int_non_negative(int(classification))
-                    validate_int_non_negative(int(player))
+                    validate_int_non_negative(location)
+                    validate_int_non_negative(classification)
+                    validate_int_non_negative(player)
                 except ValueError as err:
                     raise ValueError(
-                        f"Location id ({location}),"
-                        f"classification ({classification}) and"
-                        f"player id ({player})"
-
+                        f"Location id ({location}), "
+                        f"classification ({classification}) and "
+                        f"player id ({player}) "
                         "all have to be non negative values."
                     ) from err
                 except TypeError as err:
                     raise ValueError(
-                        f"Location id ({location}),"
-                        f"classification ({classification}) and"
-                        f"player id ({player})"
-
+                        f"Location id ({location}), "
+                        f"classification ({classification}) and "
+                        f"player id ({player}) "
                         "all have to be non negative values."
                     ) from err
 

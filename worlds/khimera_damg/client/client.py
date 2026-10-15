@@ -93,7 +93,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             :param slot_name: The name of your slot. Use quotes if the name contains spaces.
         """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
@@ -138,7 +138,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             This operation is irreversible and can cause data loss, make sure you know what you're doing.
         """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
@@ -187,7 +187,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             This operation is irreversible and can cause data loss, make sure you know what you're doing.
         """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
@@ -207,7 +207,6 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             logger.info("No data found for this slot.")
             return
 
-        # Check if the slot is connected.
         self.continue_context = "reset"
         self.continue_time = time.perf_counter()
         self.continue_args = {"g_id": g_id}
@@ -222,7 +221,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             This operation is irreversible, make sure you know what you're doing.
         """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
 
         self.continue_context = None
@@ -249,7 +248,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             [Requires an active connection]
         """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
@@ -293,7 +292,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
     def _cmd_close_game(self) -> None:
         """ Closes the game. """
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
             return
         self.continue_context = None
         self.continue_time = None
@@ -401,7 +400,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             return False
 
         if self.command_running:
-            logger.warning("Theres a command being currently executed.")
+            logger.warning("There's a command being currently executed.")
         elif self.continue_context is None or self.continue_time is None:
             logger.info("Nothing to confirm.")
         elif self.continue_time < time.perf_counter() - self.continue_timeout:
@@ -439,7 +438,6 @@ class KhimeraDAMGConnectionState:
         self.host_last_deathlink: tuple[str, int, str] | None = None
         self.locations_acked: set[int] = set()
         self.hdl_id: int = 0
-        self._goal_status_ready: asyncio.Event | None = None
         self.pending_acked_data: set[int] | None = None
         self.last_ack: int = 0
         self.req_cctx: bool | None = None
@@ -453,7 +451,6 @@ class KhimeraDAMGConnectionState:
             self.host_last_deathlink = None
             self.locations_acked = set()
             self.hdl_id = 0
-            self._goal_status_ready = None
             self.pending_acked_data = None
             self.last_ack = 0
             self.req_cctx = None
@@ -583,8 +580,6 @@ class KhimeraDAMGContext(CommonContext):
         self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher(ctx=self)
         self.slot_data: dict[str, Any] = {}
         self.communication_interface: KhimeraDAMGCommunicationInterface | None = None
-        self.interface_start = None
-        self.interface_stop = None
         self.is_game_connected = False
         self.slot_data_empty_once: bool = False
         self.communication_task: asyncio.Task | None = None
@@ -811,13 +806,20 @@ class KhimeraDAMGContext(CommonContext):
             has_goaled=is_win
         )
 
+    def _make_li(self) -> LocationInformation:
+        enabled = not self.slot_data["is_race"]
+        data: dict | None = self.slot_data["location_information"]
+        if data is None:
+            return LocationInformation(enabled, {})
+        li: dict[int, tuple[int, int]] = {}
+        for entry, value in data.items():
+            li[int(entry)] = tuple(value)
+        return LocationInformation(enabled, li)
+
     async def _start_up_game_processes(self) -> None:
         last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
         self.cctx = self._make_cctx()
-        self.li = LocationInformation(
-            not self.slot_data["is_race"],
-            self.slot_data["location_information"]
-        )
+        self.li = self._make_li()
         self.connection_state.set_item_ack(last_ack)
 
         # Shut previous interface down before starting a new one
@@ -861,7 +863,7 @@ class KhimeraDAMGContext(CommonContext):
             except Exception as err:
                 self.communication_interface = None
                 logger.exception(
-                    f"Khimera setup failed: {err}.\nServer connection remains active, "
+                    f"Khimera setup failed: {err}\nServer connection remains active, "
                     "reconnect if you intend to launch the game."
                 )
                 return False
@@ -1052,15 +1054,12 @@ class KhimeraDAMGContext(CommonContext):
                 logger.warning(
                     "A game process from a previous session has been detected. "
                     f"The client was configured to automatically connect to {address}; "
-                    "if the slot connected to is not the as the slot used when launching the game, "
+                    "if the slot connected to is not the same as the slot used when launching the game, "
                     "you will not be able to connect. "
                     "If this is the case, please close the game and try again; "
                     "disregard this message otherwise."
                 )
         return await super().connect(address)
-
-    async def disconnect(self, allow_autoreconnect: bool = False) -> None:
-        await super().disconnect(allow_autoreconnect)
 
     def reset_connection_state(self) -> None:
         self.connection_state.reset()
@@ -1085,8 +1084,7 @@ class KhimeraDAMGContext(CommonContext):
 
     def get_khimera_damg_status(self) -> str:
         return (f"Server connected: {self._is_server_connected()},"
-            f"\nGame connected: {self.is_game_connected},"
-            f"\nSlot data: {self.slot_data}")
+            f"\nGame connected: {self.is_game_connected}")
 
     async def detect_continued_game(self) -> None:
         if self.launcher.tracking:
@@ -1142,16 +1140,16 @@ class KhimeraDAMGContext(CommonContext):
         path = await self.launcher.startup_prompt()
         if path is None:
             return
-        load_successfull = False
+        load_successful = False
         try:
-            load_successfull = await asyncio.to_thread(try_load_build, path)
-            if not load_successfull:
+            load_successful = await asyncio.to_thread(try_load_build, path)
+            if not load_successful:
                 logger.warning("Couldn't load build, Please try again later.")
         except (OSError, SourceNotFoundError) as err2:
-            load_successfull = False
+            load_successful = False
             raise err2
         finally:
-            if not load_successfull:
+            if not load_successful:
                 msg = self.launcher._message("Couldn't load build", "Please try again later.", error=True)
                 if msg is not None:
                     msg.open()

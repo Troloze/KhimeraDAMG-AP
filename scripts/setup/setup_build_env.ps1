@@ -71,6 +71,16 @@ try {
     Pop-Location
 }
 
+# Ruff is not an Archipelago requirement, so ModuleUpdate never installs it. Pinned so lint
+# results stay the same across setups; scripts/run_ruff.ps1 runs this copy.
+$RuffVersion = "0.16.4"
+Write-Host "Installing ruff $RuffVersion..."
+& $VenvPython -m pip install --disable-pip-version-check "ruff==$RuffVersion"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "ruff $RuffVersion could not be installed into $Venv."
+    exit 1
+}
+
 # Smoke-test the imports an apworld build actually performs.
 $Probe = "import pathspec, yaml, schema, jinja2, orjson, platformdirs, bsdiff4, websockets; " +
          "import pkg_resources; print('ok')"

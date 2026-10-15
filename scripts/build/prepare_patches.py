@@ -108,7 +108,7 @@ except TypeError as err:
 def make_source(name: str, hash_id: str, size: int, total_size: int, file_names: list[str], files_hash_id: str) -> str:
     return (
         f"SourceData(name=\"{name}\", hash_id=\"{hash_id}\", size={size}, "
-        f"total_size={total_size}, file_names={file_names}, files_hash_id=\"{files_hash_id}\")"
+        f"total_size={total_size}, file_names={json.dumps(file_names)}, files_hash_id=\"{files_hash_id}\")"
     )
 
 

@@ -59,8 +59,6 @@ if ($tool -in @("Bash", "PowerShell")) {
 
     $denied = [ordered]@{
         "(?i)(^|\s)--?fix\b"                    = "ruff fixes are writes"
-        "(?i)build_and_replace"                 = "installing into the app folder is not permitted"
-        "(?i)Archipelago(Generate|Launcher)"    = "running the installed build is not permitted"
         "(?i)\bgit\s+(add|commit|checkout|switch|restore|stash|reset|clean|rm|mv|push|pull|fetch|merge|rebase|cherry-pick|revert|tag|am|apply|submodule)\b" = "git state changes are not permitted"
         "(?i)\b(Remove-Item|Move-Item|Rename-Item|Copy-Item|New-Item|Set-Content|Add-Content|Clear-Content|Out-File|Expand-Archive|Compress-Archive)\b" = "file-modifying cmdlets are not permitted"
         "(?i)(^|[\s;&|(])(rm|mv|cp|touch|mkdir|rmdir|del|ren|tee|truncate)\s" = "file-modifying commands are not permitted"

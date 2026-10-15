@@ -33,7 +33,6 @@ class GameNotFoundError(LauncherError):
     pass
 
 
-# Unimplemented Skeleton, deliberately does not work.
 class KhimeraDAMGLauncher:
     def __init__(self, ctx: KhimeraDAMGContext) -> None:
         self.pid: int | None = None
@@ -259,6 +258,8 @@ class KhimeraDAMGLauncher:
         return True
 
     def _search_in_steam_library(self) -> Path | None:
+        # Stub, automatically searching for a build in the steam library is a feature
+        # intended to be implemented in the future.
         raise NotImplementedError("Steam Library search is not available yet")
 
     # Generic prompt builder

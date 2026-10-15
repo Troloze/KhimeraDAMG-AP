@@ -1,10 +1,15 @@
 param(
-    [switch] $Fix 
+    [switch] $Fix
 )
 
 $Root = Split-Path $PSScriptRoot -Parent
 $RuffPath = Join-Path $Root "ruff.toml"
+$RuffExe = Join-Path $Root "py-env/Scripts/ruff.exe"
 
+if (-not (Test-Path $RuffExe)) {
+    Write-Error "ruff was not found at $RuffExe. Run scripts/setup/setup_build_env.ps1 -Force to install it."
+    exit 1
+}
 
 $Flag = ""
 if ($Fix) {
@@ -19,5 +24,4 @@ $Targets = @(
     (Join-Path $Root "scripts/build/prepare_patches.py")
 )
 
-& ruff check --config $RuffPath $Targets $Flag
-
+& $RuffExe check --config $RuffPath $Targets $Flag

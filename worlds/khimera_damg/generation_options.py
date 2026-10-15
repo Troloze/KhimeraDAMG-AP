@@ -1,8 +1,15 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from Options import Choice, DeathLink, OptionGroup, Range, StartInventoryPool, Toggle  # type: ignore
-from worlds.AutoWorld import PerGameCommonOptions  # type: ignore
+from Options import (  # type: ignore
+    Choice,
+    DeathLink,
+    OptionGroup,
+    PerGameCommonOptions,
+    Range,
+    StartInventoryPool,
+    Toggle,
+)
 
 if TYPE_CHECKING:
     from . import KhimeraDAMGWorld

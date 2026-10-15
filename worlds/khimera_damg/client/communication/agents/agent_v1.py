@@ -74,7 +74,7 @@ class AgentV1(CommunicationAgent):
                         unknown_path_set.add(beat_file)
                         logger.warning(f"Unexpected flag name: {beat_file}")
                     # Unknown value error
-                    return
+                    continue
 
                 if first is None:
                     first = beat
@@ -115,11 +115,6 @@ class AgentV1(CommunicationAgent):
 
         # Cleanup
         self._on_start(is_game_running)
-
-        # No need to error handle these, the .gsreq flag works to cover
-        # for errors here.
-        # self._send_connection_context()
-        # self._send_location_information()
 
         # No need to hold reference, it is self contained, knows when to stop,
         # is daemon and has an event to check for completion.
@@ -236,9 +231,6 @@ class AgentV1(CommunicationAgent):
                         self.connection_context = req_cctx
             if entry[0] == "req_li":
                 req_li = entry[1]
-                # if req_li is not None:
-                #     self.location_information = req_li
-                # LI does not update, so no need for this.
 
         item_list: list[tuple[int, NetworkItem]] | None = sorted(item_map.items())
 
@@ -467,24 +459,23 @@ class AgentV1(CommunicationAgent):
         name, _ = self.contract.write_content("cshb", params)
         new_path = self.sandbox / name
 
-        path_list = self.sandbox.glob("*.cshb")
-        sorted_paths = list(path_list)
+        path_list = list(self.sandbox.glob("*.cshb"))
 
-        if len(sorted_paths) == 0:
+        if len(path_list) == 0:
             # create
             with suppress(OSError):
                 new_path.write_text("")
-        elif len(sorted_paths) == 1:
+        elif len(path_list) == 1:
             # rename
             if new_path.exists():
                 return
-            file = sorted_paths[0]
+            file = path_list[0]
             with suppress(OSError):
                 file.rename(new_path)
         else:
-            # delete older, rename newest
-            file = sorted_paths.pop()
-            for entry in sorted_paths:
+            # delete all but one, and then rename
+            file = path_list.pop()
+            for entry in path_list:
                 with suppress(OSError):
                     entry.unlink()
             if file == new_path:
@@ -504,24 +495,23 @@ class AgentV1(CommunicationAgent):
         name, _ = self.contract.write_content("csc", params)
         new_path = self.sandbox / name
 
-        path_list = self.sandbox.glob("*.csc")
-        sorted_paths = list(path_list)
+        path_list = list(self.sandbox.glob("*.csc"))
 
-        if len(sorted_paths) == 0:
+        if len(path_list) == 0:
             # create
             with suppress(OSError):
                 new_path.write_text("")
-        elif len(sorted_paths) == 1:
+        elif len(path_list) == 1:
             # rename
             if new_path.exists():
                 return
-            file = sorted_paths[0]
+            file = path_list[0]
             with suppress(OSError):
                 file.rename(new_path)
         else:
-            # delete older, rename newest
-            file = sorted_paths.pop()
-            for entry in sorted_paths:
+            # delete all but one, and then rename
+            file = path_list.pop()
+            for entry in path_list:
                 with suppress(OSError):
                     entry.unlink()
             if file == new_path:

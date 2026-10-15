@@ -211,22 +211,6 @@ def _find_patch(build_name: str, host_version: str) -> Path:
     return patch_file
 
 
-def rebuild_patch(patch_path: Path, host_version: str) -> None:
-    try:
-        _version, build = _decompose_patch_name(patch_path.name)
-    except Exception as err:
-        raise ValueError("Provided file name is not valid.") from err
-
-    patch_path.unlink(missing_ok=True)
-
-    source_list = source_get(host_version, build_name=build)
-
-    if len(source_list) == 0:
-        raise SourceNotFoundError("Could not find the source path.")
-
-    _patch(source_list[0], host_version)
-
-
 def patch_validate(patch_path: Path) -> bool:
     if not patch_path.exists():
         return False
@@ -441,12 +425,6 @@ def source_get(host_version: str, *, build_name: str | None = None, return_any: 
     return ret
 
 
-def get_valid_builds(host_version: str) -> list[str]:
-    mod_version = _get_mod_version(host_version)
-    ret = _get_source_map(mod_version).values()
-    return list(ret)
-
-
 def try_load_build(candidate_path: Path) -> bool:
     validated, build_name = source_validate(candidate_path)
     if not validated or build_name is None:
@@ -480,7 +458,7 @@ def try_load_build(candidate_path: Path) -> bool:
 
     if build_name.startswith("steam"):
         steam_app_id = source_path / "steam_appid.txt"
-        if not steam_app_id.exists() or steam_app_id.read_text(encoding="utf-8-sig") == "467380":
+        if not steam_app_id.exists() or steam_app_id.read_text(encoding="utf-8-sig") != "467380":
             steam_app_id.write_text("467380", encoding="utf-8")
 
     return True
