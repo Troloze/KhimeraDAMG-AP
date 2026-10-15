@@ -20,6 +20,7 @@ class ConnectionContext:
     locations: set[int]
     item_list: list[tuple[int, NetworkItem]]
     has_goaled: bool
+    game_id: str  # Tracks which game id the context belongs to; is not used for anything else.
 
     def to_dict(self) -> dict[str, Any]:
         return {

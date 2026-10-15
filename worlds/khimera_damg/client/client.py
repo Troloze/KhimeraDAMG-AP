@@ -760,13 +760,12 @@ class KhimeraDAMGContext(CommonContext):
             self.communication_task = None
 
     def _make_cctx(self) -> ConnectionContext:
-        last_ack = max(
-            self.connection_state.get_last_ack(),
-            KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
-        )
-
         if self.slot_name is None or self.host_world_version is None or self.game_id is None:
             if self.cctx is not None:
+                last_ack = max(
+                    self.connection_state.get_last_ack(),
+                    KhimeraDAMGStorageHandler.get("last_ack", self.cctx.game_id, 0, folder="game_data")  # type: ignore
+                )
                 game_data = KhimeraDAMGStorageHandler.get("game_data", self.cctx.game_id, {}, folder="game_data")  # type: ignore
                 return ConnectionContext(
                     ap_version=self.cctx.ap_version,
@@ -780,10 +779,14 @@ class KhimeraDAMGContext(CommonContext):
                     game_data=game_data,
                     locations=self.cctx.locations,
                     item_list=self.cctx.item_list,
-                    has_goaled=self.cctx.has_goaled
+                    has_goaled=self.cctx.has_goaled,
+                    game_id=self.cctx.game_id
                 )
             raise RuntimeError("Attempt to make a connection context before the first server connection.")
-
+        last_ack = max(
+            self.connection_state.get_last_ack(),
+            KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
+        )
         items = self.items_received  # Accessed asynchronously, state can change between a loop's readings
         item_list = [(i + 1, items[i]) for i in range(0, len(items))]
         win_status = self.stored_data.get(f"_read_client_status_{self.team}_{self.slot}")
@@ -803,7 +806,8 @@ class KhimeraDAMGContext(CommonContext):
             game_data=game_data,
             locations=self.checked_locations,
             item_list=item_list,
-            has_goaled=is_win
+            has_goaled=is_win,
+            game_id=self.game_id
         )
 
     def _make_li(self) -> LocationInformation:
