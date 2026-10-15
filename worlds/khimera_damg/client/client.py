@@ -8,7 +8,6 @@ from contextlib import suppress
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, ClassVar
 
-
 import Utils  # type: ignore
 from CommonClient import (  # type: ignore
     ClientCommandProcessor,
