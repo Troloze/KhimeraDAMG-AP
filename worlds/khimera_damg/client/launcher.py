@@ -70,7 +70,7 @@ class KhimeraDAMGLauncher:
                 ) from err
             load_success = False
             try:
-                load_success = try_load_build(path)
+                load_success = await asyncio.to_thread(try_load_build, path)
             except (OSError, SourceNotFoundError) as err2:
                 msg = self._message("Couldn't load build", "Please try again later.", error=True)
                 logger.warning("Couldn't load build, please try again later.")
@@ -79,7 +79,7 @@ class KhimeraDAMGLauncher:
                 raise err2
             if load_success:
                 try:
-                    load_patch(host_version)
+                    await asyncio.to_thread(load_patch, host_version)
                 except Exception as err2:
                     msg = self._message(
                         "Couldn't load build",
