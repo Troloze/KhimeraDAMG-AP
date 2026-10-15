@@ -100,7 +100,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         g_id = None
 
         if slot_name == "" or seed == "":
-            g_id = self.ctx.game_id
+            g_id = self._current_game_id()
             if g_id is None:
                 logger.info("Please provide the name and seed parameters, "
                             "or use this command while the client is connected."
@@ -197,8 +197,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             return
 
         g_id = get_game_id(slot_name, seed)
-        if self.ctx.game_id == g_id:
-            # Not exactly the correct condition to enter here, but it will work while we don't have a launcher
+        if g_id == self._current_game_id():
             logger.info("You cannot reset the currently loaded game data. Close the game and try again.")
             return
 
@@ -224,10 +223,11 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         if self.command_running:
             logger.warning("Theres a command being currently executed.")
             return
+
         self.continue_context = None
         self.continue_time = None
         self.continue_args = None
-        g_id = self.ctx.game_id
+        g_id = self._current_game_id()
 
         self.continue_context = "wipe"
         self.continue_args = {"g_id": g_id}
@@ -357,6 +357,10 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
             if self.continue_context == "wipe_":
                 # Wipe everything.
                 g_id = None if self.continue_args is None else self.continue_args.get("g_id")
+                # One more validation in case the user swapped slots in between commands
+                if g_id != self._current_game_id():
+                    logger.warning("Failed to wipe due to a slot change, please try again.")
+                    return False
                 KhimeraDAMGStorageHandler.wipe(g_id)
                 if g_id is None:
                     logger.info("All game data has been deleted.")
@@ -369,6 +373,12 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                     )
                     return False
                 g_id = self.continue_args["g_id"]
+
+                # One more validation in case the user swapped slots in between commands
+                if g_id == self._current_game_id():
+                    logger.warning("Failed to delete game data; the selected slot has been loaded.")
+                    return False
+
                 if KhimeraDAMGStorageHandler.delete_data(g_id):
                     logger.info("Deleted game data successfully.")
                 else:
@@ -407,6 +417,15 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                     self.continue_context = None
                     self.continue_time = None
                     self.continue_args = None
+
+    ################
+    # Non-Commands #
+    ################
+
+    def _current_game_id(self) -> str | None:
+        if self.ctx.game_id is not None:
+            return self.ctx.game_id
+        return self.ctx.launcher.game_id if self.ctx.launcher.tracking else None
 
 
 class KhimeraDAMGConnectionState:
