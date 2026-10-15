@@ -175,14 +175,14 @@ class OptionDataHandler:
                 clean_value = normalize_and_sanitize(value)
                 values.append(clean_value)
             elif e_type == "NL":
-                # validate_list(value)  # Data is controled by the game, we can skip validation
+                # validate_list(value)  # Data is controlled by the game, we can skip validation
                 names.append(clean_entry)
                 types.append(e_type)
                 values.append(
                     [normalize_number(v) for v in value]
                 )
             elif e_type == "SL":
-                # validate_list(value)  # Data is controled by the game, we can skip validation
+                # validate_list(value)  # Data is controlled by the game, we can skip validation
                 names.append(clean_entry)
                 types.append(e_type)
                 values.append([
