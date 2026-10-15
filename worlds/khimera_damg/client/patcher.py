@@ -99,13 +99,21 @@ def _decompose_patch_name(patch_name: str) -> tuple[str, str]:
     return (decomposed[0], decomposed[1])
 
 
-def _get_mod_version(apw_version: str) -> tuple[int, int, int]:
+def _get_mod_version(host_version: str) -> tuple[int, int, int]:
     try:
-        digits = tuple(map(int, apw_version.split(".")))
+        digits = tuple(map(int, host_version.split(".")))
     except (TypeError, ValueError) as err:
-        raise ValueError("Version strings must be composed of 3 numbers separated by dots.") from err
+        raise ValueError(
+            f"Version strings must be composed of 3 numbers separated by dots. ({host_version})\n"
+            "This error shouldn't happen; if you haven't messed with the "
+            "apworld, please report this to the developer."
+        ) from err
     if len(digits) != 3:
-        raise ValueError("Version strings must be composed of 3 numbers separated by dots.")
+        raise ValueError(
+            f"Version strings must be composed of 3 numbers separated by dots. ({host_version})\n"
+            "This error shouldn't happen; if you haven't messed with the "
+            "apworld, please report this to the developer."
+        )
     if digits > max_apworld:
         raise APWorldVersionTooHighError(
             "The version of the host apworld is too high for this client. "
@@ -115,13 +123,13 @@ def _get_mod_version(apw_version: str) -> tuple[int, int, int]:
         raise APWorldVersionTooLowError(
             "The version of the host apworld is too low for this client. "
             "This error shouldn't ever happen; if you haven't messed with the "
-            "apworld, please report this to the dev"
+            "apworld, please report this to the developer."
         )  # Genuinely impossible to happen under normal circumstances.
     # This function is barely ever called and the lookup dictionary will never be big enough.
     # It's ok for this to stay suboptimal.
     mod_digits: tuple[int, int, int] | None = max((k for k in apworld_to_mod_map if k <= digits), default=None)
     if mod_digits is None:
-        raise ValueError(f'Version "{apw_version}" is not valid')
+        raise ValueError(f'Version "{host_version}" is not valid')
 
     return apworld_to_mod_map[mod_digits]
 
@@ -166,8 +174,8 @@ def _find_diff(build_name: str, mod_version: tuple[int, int, int]) -> bytes:
         return zip_ref.read(f"{build_name}/kdamg_diff.bsdiff4")
 
 
-def _patch(build_name: str, apw_version: str) -> Path:
-    mod_version = _get_mod_version(apw_version)
+def _patch(build_name: str, host_version: str) -> Path:
+    mod_version = _get_mod_version(host_version)
     source_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{build_name}")
     source_data = source_path / "data.win"
     diff = _find_diff(build_name, mod_version)
@@ -191,8 +199,8 @@ def _patch(build_name: str, apw_version: str) -> Path:
     )
 
 
-def _find_patch(build_name: str, apw_version: str) -> Path:
-    mod_version = _get_mod_version(apw_version)
+def _find_patch(build_name: str, host_version: str) -> Path:
+    mod_version = _get_mod_version(host_version)
 
     patch_file = KhimeraDAMGStorageHandler.get_path_raw(_make_patch_name(build_name, mod_version), "patches")
 
@@ -203,7 +211,7 @@ def _find_patch(build_name: str, apw_version: str) -> Path:
     return patch_file
 
 
-def rebuild_patch(patch_path: Path, apw_version: str) -> None:
+def rebuild_patch(patch_path: Path, host_version: str) -> None:
     try:
         _version, build = _decompose_patch_name(patch_path.name)
     except Exception as err:
@@ -211,12 +219,12 @@ def rebuild_patch(patch_path: Path, apw_version: str) -> None:
 
     patch_path.unlink(missing_ok=True)
 
-    source_list = source_get(apw_version, build_name=build)
+    source_list = source_get(host_version, build_name=build)
 
     if len(source_list) == 0:
         raise SourceNotFoundError("Could not find the source path.")
 
-    _patch(source_list[0], apw_version)
+    _patch(source_list[0], host_version)
 
 
 def patch_validate(patch_path: Path) -> bool:
@@ -243,16 +251,16 @@ def patch_validate(patch_path: Path) -> bool:
     return True
 
 
-# Raises UnsupportedBuildError when source_path build is not compatible with apw_version.
+# Raises UnsupportedBuildError when source_path build is not compatible with host_version.
 # Raises ValueError when the version is not valid.
 # All other Exceptions raised should not happen under normal circumstances, so let them explode.
-def get_patch(source_path: Path, apw_version: str) -> Path:
-    mod_version = _get_mod_version(apw_version)
+def get_patch(source_path: Path, host_version: str) -> Path:
+    mod_version = _get_mod_version(host_version)
     build = _check_source_build(source_path, mod_version)
     try:
-        patch_path = _find_patch(build, apw_version)
+        patch_path = _find_patch(build, host_version)
     except PatchNotFoundError:  # There are other exceptions, but they won't be handled here
-        patch_path = _patch(build, apw_version)
+        patch_path = _patch(build, host_version)
 
     return patch_path
 
@@ -275,11 +283,11 @@ def _hash_multiple_files(file_list: list[Path]) -> str:
     return source_hash.hexdigest()
 
 
-def load_patch(apw_version: str) -> None:
+def load_patch(host_version: str) -> None:
     current_version = KhimeraDAMGStorageHandler.get("version", "meta", category="current_patch")
     loaded_path = KhimeraDAMGStorageHandler.get_path_raw(folder="loaded_patch")
 
-    if current_version is not None and current_version == apw_version and loaded_path.exists():
+    if current_version is not None and current_version == host_version and loaded_path.exists():
         current_files: list[str] = KhimeraDAMGStorageHandler.get("files", "meta", category="current_patch")
         current_hash: str = KhimeraDAMGStorageHandler.get("hash", "meta", category="current_patch")
 
@@ -318,7 +326,7 @@ def load_patch(apw_version: str) -> None:
 
     loaded_path.mkdir()
 
-    sources = source_get(apw_version)
+    sources = source_get(host_version)
     if len(sources) == 0:
         raise SourceNotFoundError("Could not find a compatible source.")
 
@@ -327,7 +335,7 @@ def load_patch(apw_version: str) -> None:
     source = sources[0]  # The available source, or itch if both (considering itch comes first alphabetically)
     source_path = KhimeraDAMGStorageHandler.get_path_raw(folder=f"source/{source}")
 
-    patch = get_patch(source_path, apw_version)
+    patch = get_patch(source_path, host_version)
 
     source_file_paths = list(source_path.iterdir())
     source_files = [entry.name for entry in source_file_paths]
@@ -352,7 +360,7 @@ def load_patch(apw_version: str) -> None:
     patch_hash = _hash_multiple_files(loaded_file_paths)
 
     current_patch_data = {
-        "version": apw_version,
+        "version": host_version,
         "files": loaded_files,
         "hash": patch_hash
     }
@@ -413,8 +421,8 @@ def source_validate(source_path: Path) -> tuple[bool, str | None]:
 
 
 # Returns all available source builds. An empty return means there are no builds for this version.
-def source_get(apw_version: str, *, build_name: str | None = None, return_any: bool = False) -> list[str]:
-    mod_version = _get_mod_version(apw_version)
+def source_get(host_version: str, *, build_name: str | None = None, return_any: bool = False) -> list[str]:
+    mod_version = _get_mod_version(host_version)
     build_list = _get_source_map(mod_version).values()
     ret: list[str] = []
     for name in build_list:
@@ -433,8 +441,8 @@ def source_get(apw_version: str, *, build_name: str | None = None, return_any: b
     return ret
 
 
-def get_valid_builds(apw_version: str) -> list[str]:
-    mod_version = _get_mod_version(apw_version)
+def get_valid_builds(host_version: str) -> list[str]:
+    mod_version = _get_mod_version(host_version)
     ret = _get_source_map(mod_version).values()
     return list(ret)
 
@@ -476,3 +484,7 @@ def try_load_build(candidate_path: Path) -> bool:
             steam_app_id.write_text("467380", encoding="utf-8")
 
     return True
+
+
+def validate_version(host_version: str) -> None:
+    _get_mod_version(host_version)

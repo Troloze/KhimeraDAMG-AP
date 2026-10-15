@@ -24,7 +24,7 @@ from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ign
 from .. import APWORLD_VERSION, GAME_FULL_NAME
 from .communication import KhimeraDAMGCommunicationInterface
 from .launcher import KhimeraDAMGLauncher
-from .patcher import SourceNotFoundError, source_get, try_load_build
+from .patcher import SourceNotFoundError, source_get, try_load_build, validate_version
 from .storage import KhimeraDAMGStorageHandler
 from .types import ConnectionContext, LocationInformation, RuntimeInformation
 
@@ -898,9 +898,24 @@ class KhimeraDAMGContext(CommonContext):
             if msg is not None:
                 msg.open()
             return False
-        self.slot_name = self.slot_info[self.slot].name
-        self.game_id = get_game_id(self.slot_name, self.host_seed)  # type: ignore
-        self.host_world_version = self.slot_data["apworld_version"]
+        slot_name = self.slot_info[self.slot].name
+        game_id = get_game_id(slot_name, self.host_seed)  # type: ignore
+        host_world_version = self.slot_data["apworld_version"]
+
+        try:
+            validate_version(host_world_version)
+        except Exception as err:
+            msg = self.launcher._message(
+                "Version Error.",
+                f"Unexpected version error: {err}\n",
+                error=True
+            )
+            logger.warning(
+                f"Unexpected version error: {err}\n"
+            )
+            if msg is not None:
+                msg.open()
+            return False
 
         if self.launcher.tracking:
             if APWORLD_VERSION != self.launcher.apw_version:
@@ -921,7 +936,7 @@ class KhimeraDAMGContext(CommonContext):
                 return False
 
             # Validation only looks at game_id
-            if self.game_id != self.launcher.game_id:
+            if game_id != self.launcher.game_id:
 
                 msg = self.launcher._message(
                     "Failed to connect",
@@ -936,6 +951,10 @@ class KhimeraDAMGContext(CommonContext):
                 if msg is not None:
                     msg.open()
                 return False
+
+        self.slot_name = slot_name
+        self.game_id = game_id
+        self.host_world_version = host_world_version
         return True
 
     async def _get_slot_data(self, args: dict) -> bool:
