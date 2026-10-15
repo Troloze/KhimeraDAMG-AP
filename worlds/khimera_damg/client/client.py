@@ -724,18 +724,38 @@ class KhimeraDAMGContext(CommonContext):
             self.connection_state.get_last_ack(),
             KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
         )
+
+        if self.slot_name is None or self.host_world_version is None or self.game_id is None:
+            if self.cctx is not None:
+                game_data = KhimeraDAMGStorageHandler.get("game_data", self.cctx.game_id, {}, folder="game_data")  # type: ignore
+                return ConnectionContext(
+                    ap_version=self.cctx.ap_version,
+                    host_world_version=self.cctx.host_world_version,
+                    client_world_version=self.cctx.client_world_version,
+                    slot_name=self.cctx.slot_name,
+                    seed=self.cctx.seed,
+                    last_ack=last_ack,
+                    options=self.cctx.options,
+                    generation_information=self.cctx.generation_information,
+                    game_data=game_data,
+                    locations=self.cctx.locations,
+                    item_list=self.cctx.item_list,
+                    has_goaled=self.cctx.has_goaled
+                )
+            raise RuntimeError("Attempt to make a connection context before the first server connection.")
+
         items = self.items_received  # Accessed asynchronously, state can change between a loop's readings
         item_list = [(i + 1, items[i]) for i in range(0, len(items))]
         win_status = self.stored_data.get(f"_read_client_status_{self.team}_{self.slot}")
         # Resolves to "False" if win_status is None
         is_win = win_status == ClientStatus.CLIENT_GOAL
         # This will return the entirety of the "game_data" category.
-        game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {}, folder="game_data")  # type: ignore
+        game_data = KhimeraDAMGStorageHandler.get("game_data", self.game_id, {}, folder="game_data")
         return ConnectionContext(
             ap_version=Utils.__version__,
-            host_world_version=self.host_world_version,  # type: ignore
+            host_world_version=self.host_world_version,
             client_world_version=APWORLD_VERSION,
-            slot_name=self.slot_name,  # type: ignore
+            slot_name=self.slot_name,
             seed=self.host_seed,  # type: ignore
             last_ack=last_ack,
             options=self.slot_data["options"],
@@ -967,19 +987,17 @@ class KhimeraDAMGContext(CommonContext):
         self.connection_state.set_item_ack(last_ack)
 
     async def connection_closed(self) -> None:
+        try:
+            self.cctx = self._make_cctx()
+        except OSError:
+            # Seems like we will have to stay with an outdated cctx.
+            # Should be fine though.
+            pass
+
         self.game_id = None
         self.is_game_connected = False
         self.host_world_version = None
         self.slot_name = None
-        # Disconnecting shouldn't stop the loop, only closing the app, or connecting to a different slot
-
-        # self.interface_stop = self.communication_interface.stop()
-        # await self.interface_stop
-
-        # last_package = self.communication_interface.consume_outgoing()
-        # if last_package is not None:
-        #    await self._process_game_package(last_package)
-
         await super().connection_closed()
 
     def _is_socket_open(self) -> bool:
