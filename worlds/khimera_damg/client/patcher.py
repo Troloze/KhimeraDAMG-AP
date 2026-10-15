@@ -327,6 +327,7 @@ def load_patch(host_version: str) -> None:
     loaded_files = []
 
     for entry in source_files:
+        src = source_path / entry
         if entry == "data.win":
             # Replace with the patched data.win
             target = loaded_path / "data.win"
@@ -334,10 +335,10 @@ def load_patch(host_version: str) -> None:
         elif entry == "khimera1.exe":
             # Rename executable so we have an unique exe name for ourselves.
             target = loaded_path / executable_name
-            shutil.copy2(entry, target)
+            shutil.copy2(src, target)
         else:
             target = loaded_path / entry
-            shutil.copy2(entry, target)
+            shutil.copy2(src, target)
         loaded_files.append(entry)
         loaded_file_paths.append(target)
 
