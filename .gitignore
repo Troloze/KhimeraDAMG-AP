@@ -5,7 +5,7 @@
 __pycache__/
 
 /build/
-/worlds/khimera_damg/patches/*.zip
-/worlds/khimera_damg/patches/data.py
+/khimera_damg/patches/*.zip
+/khimera_damg/patches/data.py
 /docs/report/
 /fuzz-env/

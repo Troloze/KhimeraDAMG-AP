@@ -132,7 +132,7 @@ function Resolve-RemoteTarget {
 function Remove-LinksInside {
     # Deletes every junction and directory symlink below $Path without following it. Remove-Item
     # on Windows PowerShell has a history of recursing into a junction's target, and the world link
-    # inside Archipelago points at worlds\khimera_damg in this repository, so the links have to go
+    # inside Archipelago points at khimera_damg\ in this repository, so the links have to go
     # before anything deletes or cleans the tree around them. DirectoryInfo.Delete() on a reparse
     # point removes only the link.
     param(

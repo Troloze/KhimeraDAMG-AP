@@ -7,7 +7,7 @@
 .DESCRIPTION
     Every tracked file is reset to that commit and everything else is deleted, ignored files
     included (logs, host.yaml, __pycache__). The world link is removed first so nothing reaches
-    worlds\khimera_damg through it, and created again at the end.
+    khimera_damg\ in this repository through it, and created again at the end.
 
     When the clone cannot be restored in place, the folder is deleted and the same commit is
     downloaded again. When there is no usable clone at all, this falls back to

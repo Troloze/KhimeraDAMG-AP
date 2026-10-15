@@ -9,7 +9,7 @@ $Prepare     = Join-Path $PSScriptRoot "build\prepare_patches.py"
 $GameName    = "Khimera: Destroy All Monster Girls"
 $OutputFile  = Join-Path $Root "build\apworlds\khimera_damg.apworld"
 $PatchSource = Join-Path $Root "KhimeraDAMG-AP-Mod\releases"
-$PatchDest   = Join-Path $Root "worlds\khimera_damg\patches"
+$PatchDest   = Join-Path $Root "khimera_damg\patches"
 
 if (-not (Test-Path $Launcher)) {
     throw "Archipelago submodule not checked out: $Launcher is missing."

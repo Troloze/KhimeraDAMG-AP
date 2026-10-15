@@ -7,7 +7,7 @@ param(
 $Root         = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ApRoot       = Join-Path $Root "Archipelago"
 $ApWorldsDir  = Join-Path $ApRoot "worlds"
-$WorldSource  = Join-Path $Root "worlds\khimera_damg"
+$WorldSource  = Join-Path $Root "khimera_damg"
 $LinkPath     = Join-Path $ApWorldsDir "khimera_damg"
 $ExcludeEntry = "worlds/khimera_damg"
 
@@ -31,10 +31,16 @@ if ($Existing) {
                      "scripts\restore_archipelago.ps1; this script will not delete real files.")
         exit 1
     }
-    if (-not $Force) {
-        Write-Host "World link already present: $LinkPath -> $($Existing.Target)"
+    # A link left over from an older layout still counts as present, so compare where it points.
+    $CurrentTarget = [System.IO.Path]::GetFullPath(@($Existing.Target)[0]).TrimEnd("\")
+    $Stale = $CurrentTarget -ne [System.IO.Path]::GetFullPath($WorldSource).TrimEnd("\")
+    if (-not $Force -and -not $Stale) {
+        Write-Host "World link already present: $LinkPath -> $CurrentTarget"
     }
     else {
+        if ($Stale) {
+            Write-Host "Replacing the world link at $LinkPath, which points at $CurrentTarget"
+        }
         # DirectoryInfo.Delete() removes the reparse point itself. Remove-Item on a junction
         # has a history of recursing into the target on Windows PowerShell, so avoid it here.
         $Existing.Delete()

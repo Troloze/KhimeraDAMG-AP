@@ -5,7 +5,7 @@
     Runs the apworld's own unit tests, and optionally Archipelago's core suite for this world.
 
 .DESCRIPTION
-    The tests live in worlds/khimera_damg/tests and are run with stdlib unittest through the
+    The tests live in khimera_damg/tests and are run with stdlib unittest through the
     build venv in py-env, so nothing extra has to be installed. Archipelago itself is imported
     from the submodule, and the apworld is reached through the junction that setup_world_link.ps1
     creates at Archipelago/worlds/khimera_damg.
@@ -28,7 +28,7 @@
 
 .PARAMETER Area
     Only run one area of the suite: generation, client or guards. These are the folders under
-    worlds/khimera_damg/tests.
+    khimera_damg/tests.
 
 .PARAMETER Filter
     Only run tests whose name matches this substring or glob (unittest's -k).
