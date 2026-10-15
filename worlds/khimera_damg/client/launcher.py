@@ -13,7 +13,7 @@ import psutil
 import Utils  # type: ignore
 
 from .. import APWORLD_VERSION
-from .patcher import SourceNotFoundError, executable_name, load_patch, try_load_build
+from .patcher import SourceNotFoundError, executable_name, load_patch, try_load_build, FailedToBuildError
 from .storage import KhimeraDAMGStorageHandler
 
 if TYPE_CHECKING:
@@ -69,7 +69,23 @@ class KhimeraDAMGLauncher:
                     f"There is no game to be launched for the host version: {host_version}."
                 ) from err
             try:
-                try_load_build(path)
+                if try_load_build(path):
+                    try:
+                        load_patch(host_version)
+                    except Exception as err2:
+                        msg = self._message(
+                            "Couldn't load build", 
+                            "The import was successful, but it was not possible to load the build.",
+                            error=True
+                        )
+                        logger.warning(
+                            "The import was successful, but it was not possible to load the build."
+                        )
+                        if msg is not None:
+                            msg.open()
+                        raise FailedToBuildError(
+                            "The import was successful, but it was not possible to load the build."
+                        ) from err2
             except (OSError, SourceNotFoundError) as err2:
                 msg = self._message("Couldn't load build", "Please try again later.", error=True)
                 logger.warning("Couldn't load build, please try again later.")
