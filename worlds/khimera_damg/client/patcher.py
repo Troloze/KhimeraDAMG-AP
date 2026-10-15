@@ -85,12 +85,6 @@ min_apworld = (0, 0, 9)  # Update to (0, 1, 0) on the first release, and keep it
 executable_name = "khimera_damg_ap_randomizer.exe"
 
 
-def _make_hash_name(build_name: str, mod_version: tuple[int, int, int] | str) -> str:
-    if isinstance(mod_version, tuple):
-        mod_version = ".".join([str(i) for i in mod_version])
-    return f"{mod_version}_{build_name}.txt"
-
-
 def _make_patch_name(build_name: str, mod_version: tuple[int, int, int] | str) -> str:
     if isinstance(mod_version, tuple):
         mod_version = ".".join([str(i) for i in mod_version])
@@ -190,46 +184,31 @@ def _patch(build_name: str, apw_version: str) -> Path:
     if not output_hash == patch.hash_id:
         raise RuntimeError('Patched "data.win" does not match the hash signature.')
 
-    output_path = KhimeraDAMGStorageHandler.store_as_file(
+    return KhimeraDAMGStorageHandler.store_as_file(
         output,
         _make_patch_name(build_name, mod_version),
         folder="patches"
     )
-    KhimeraDAMGStorageHandler.store_as_file(output_hash, _make_hash_name(build_name, mod_version), folder="patches")
-
-    return output_path
 
 
 def _find_patch(build_name: str, apw_version: str) -> Path:
     mod_version = _get_mod_version(apw_version)
 
-    hash_file = KhimeraDAMGStorageHandler.get_path_raw(_make_hash_name(build_name, mod_version), "patches")
     patch_file = KhimeraDAMGStorageHandler.get_path_raw(_make_patch_name(build_name, mod_version), "patches")
-    if not hash_file.exists() or not patch_file.exists():
-        hash_file.unlink(missing_ok=True)
+
+    if not patch_validate(patch_file):
         patch_file.unlink(missing_ok=True)
         raise PatchNotFoundError
 
-    patch_hash = hash_file.read_text(encoding="utf-8-sig")
-
-    patch = patch_map.get((mod_version, build_name))
-    if patch is None:
-        raise HowDidWeGetHereError("If this is raised, something is very wrong.")
-    if not patch_hash == patch.hash_id:
-        patch_file.unlink()
-        raise PatchNotFoundError
     return patch_file
 
 
 def rebuild_patch(patch_path: Path, apw_version: str) -> None:
     try:
-        version, build = _decompose_patch_name(patch_path.name)
+        _version, build = _decompose_patch_name(patch_path.name)
     except Exception as err:
         raise ValueError("Provided file name is not valid.") from err
 
-    hash_path = KhimeraDAMGStorageHandler.get_path_raw(_make_hash_name(build, version), "patches")
-
-    hash_path.unlink(missing_ok=True)
     patch_path.unlink(missing_ok=True)
 
     source_list = source_get(apw_version, build_name=build)
@@ -350,25 +329,32 @@ def load_patch(apw_version: str) -> None:
 
     patch = get_patch(source_path, apw_version)
 
-    source_files = [entry.name for entry in source_path.iterdir()]
-    source_file_paths = [source_path / entry for entry in source_files]
-    loaded_file_paths = [loaded_path / entry for entry in source_files]
-    for entry in source_file_paths:
-        if entry.name == "data.win":
-            shutil.copy2(patch, loaded_path / "data.win")
-            continue
-        if entry.name == "khimera1.exe":
-            # Rename executable so we have an unique exe name for ourselves.
-            shutil.copy2(entry, loaded_path / executable_name)
-            continue
-        shutil.copy2(entry, loaded_path)
+    source_file_paths = list(source_path.iterdir())
+    source_files = [entry.name for entry in source_file_paths]
+    loaded_file_paths = []
+    loaded_files = []
 
-    source_hash = _hash_multiple_files(loaded_file_paths)
+    for entry in source_files:
+        if entry == "data.win":
+            # Replace with the patched data.win
+            target = loaded_path / "data.win"
+            shutil.copy2(patch, target)
+        elif entry == "khimera1.exe":
+            # Rename executable so we have an unique exe name for ourselves.
+            target = loaded_path / executable_name
+            shutil.copy2(entry, target)
+        else:
+            target = loaded_path / entry
+            shutil.copy2(entry, target)
+        loaded_files.append(entry)
+        loaded_file_paths.append(target)
+
+    patch_hash = _hash_multiple_files(loaded_file_paths)
 
     current_patch_data = {
         "version": apw_version,
-        "files": source_files,
-        "hash": source_hash
+        "files": loaded_files,
+        "hash": patch_hash
     }
 
     KhimeraDAMGStorageHandler.store_many(

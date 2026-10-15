@@ -258,10 +258,13 @@ class KhimeraDAMGStorageHandler:
         folder: str | None = None
     ) -> Path:
         path = cls.get_path_raw(file_name, folder)
+        tmp = path.parent / (path.name + ".tmp")
         if isinstance(data, bytes):
-            with open(path, "wb") as f:
+            with open(tmp, "wb") as f:
                 f.write(data)
         elif isinstance(data, str):
-            with open(path, "w", encoding="utf-8") as f:
+            with open(tmp, "w", encoding="utf-8") as f:
                 f.write(data)
+        if tmp.exists():
+            os.replace(tmp, path)
         return path
