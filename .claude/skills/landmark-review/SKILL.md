@@ -32,10 +32,11 @@ developer what state it is in before a milestone release.
   - The apworld, under `worlds/khimera_damg/`: generation (items, locations, regions, rules,
     options), a client that talks to the game through files described in a versioned
     communication contract, a launcher, and a patcher that applies small binary diff patches to
-    the game.
+    the game. Its `tests/` package is a development-only unittest suite, kept out of the built
+    `.apworld` by `.apignore`.
   - The game-side mod, in the `KhimeraDAMG-AP-Mod/` submodule.
-  - Repository tooling: PowerShell scripts in `scripts/` for setup, build, lint and fuzzing, plus
-    design notes in `docs/`.
+  - Repository tooling: PowerShell scripts in `scripts/` for setup, build, lint, tests and
+    fuzzing, plus design notes in `docs/`.
 
   `Archipelago/` is a submodule fork of Archipelago and serves as reference and build host.
   Testing targets the *installed* Archipelago build, whose core version may differ from the
@@ -64,13 +65,19 @@ developer what state it is in before a milestone release.
   - Running `scripts/build_apworld.ps1`. It writes gitignored build outputs in this repository,
     and runs Archipelago's `Launcher.py` from the submodule, which leaves logs, `host.yaml` and
     `__pycache__/` inside `Archipelago/`.
-  - Running `scripts/run_fuzzer.ps1`, including `-Setup` if the fuzzer is not set up yet. It
-    writes into the gitignored `_ignore_/`, `fuzzer/` and `build/` folders, plus whatever the
-    build step above leaves in `Archipelago/`.
-  - Running Archipelago's core unit tests from the fuzzer worktree `_ignore_/ap-fuzz`, with the
-    freshly built `.apworld` in its `custom_worlds/`, as the index section of `CLAUDE.md`
-    describes. Never run them from `Archipelago/` itself. Running the apworld's own tests, if any
-    exist, is covered the same way by `CLAUDE.md` rule 3.
+  - Running `scripts/run_fuzzer.ps1` with any `-Pass`, including `-Setup` if the fuzzer is not
+    set up yet. It writes into the gitignored `fuzz-env/`, `fuzzer/` and `build/` folders, plus
+    whatever the build step above leaves in `Archipelago/`. Before each run it may move the fuzzer
+    worktree `fuzz-env/ap-fuzz` to the commit the `Archipelago` submodule is at (a checkout inside
+    that worktree, never in `Archipelago/`) and reinstall the worktree's requirements into its
+    venv; `-Setup` also clones the fuzzer and `empty-apworld` from GitHub. All of that is part of
+    the permitted command. Record a worktree move under "Not verified" as a side effect.
+  - Running `scripts/run_tests.ps1`, with any of its switches. It runs the apworld's own tests in
+    `worlds/khimera_damg/tests/` and, with `-Core` or `-All`, Archipelago's core suite scoped to
+    this world, from a temporary folder, and writes nothing into the repository.
+  - Running Archipelago's core unit tests from the fuzzer worktree `fuzz-env/ap-fuzz`, with the
+    freshly built `.apworld` in its `custom_worlds/`, exactly as the index section of `CLAUDE.md`
+    gives the command (including `-t .`). Never run them from `Archipelago/` itself.
   - Running `scripts/run_ruff.ps1` or `ruff check --config ruff.toml`, never with `--fix` or
     `-Fix`.
   - Reading `C:\ProgramData\Archipelago\` (the installed build, including `manifest.json` and
@@ -126,7 +133,8 @@ developer what state it is in before a milestone release.
   </reference_only>
   <out_of_scope>
   Gitignored working folders (`python/`, `py-env/`, `build/` except the built apworld,
-  `_ignore_/` except fuzzer output, `fuzzer/`, `testing/`).
+  `fuzz-env/` except the fuzzer's archived results in `fuzz-env/ap-fuzz/fuzz_runs/`, `fuzzer/`,
+  `testing/`).
   </out_of_scope>
   Read every in-scope source file in full. Do not sample or skim.
 </scope>
@@ -200,8 +208,12 @@ developer what state it is in before a milestone release.
   reference for which of these a version bump has to touch.
   </area>
   <area id="A11" name="Test coverage">
-  Which behaviours have tests and which do not. Report gaps as a list, ranked by risk. Do not file
-  them as defects.
+  Which behaviours have tests and which do not, measured against the apworld's own suite in
+  `worlds/khimera_damg/tests/` (described in `CLAUDE.md`, "The apworld's test suite") and the
+  fuzzer passes. Report gaps as a list, ranked by risk. Do not file them as defects. A test that
+  fails, or a test that cannot fail (an assertion that always holds, a skip that always fires),
+  is a defect and belongs in the relevant area instead. The tests are AI-written by design and
+  apignored; that is not a finding, but a test package that would reach the built `.apworld` is.
   </area>
 </review_areas>
 
@@ -299,25 +311,31 @@ Phase 2: Exploration and mapping
 
 Phase 3: Baseline checks (start the fuzzer early, then continue)
 19. Run `scripts/build_apworld.ps1`. Record success or failure and any warnings.
-20. Start the fuzzer in the background, following `docs/Running the Fuzzer.md` (run setup first if
-    needed), through `scripts/run_fuzzer.ps1`. As `CLAUDE.md` explains, that script always loads
-    all six counted hooks in one run, and that combination cannot report a failure, drops the
-    Empty slot, and (under `--skip-output`) never fires `detect_output_placement_changes`. Its
-    result shows only that the build and copy work; never present it as a failure rate.
-    - Pass the `fuzz-meta` constraints only if `fuzz-meta/khimera_damg.yaml` holds a YAML
-      mapping, and pass it by absolute path. While it is comments only, `-m` crashes the fuzzer;
-      skip it and say so instead of reproducing the crash.
-    - The passes that measure what the index measures (one with no checking hooks and the Empty
-      world in every generation, and one per counted hook) need `fuzz.py` run directly, which is
-      not in the permissions. Record the gap under "Not verified" and as a finding, with the exact
-      difference between what ran and what the index measures. If the live rules from Phase 1
-      require anything else the tooling cannot do, record that the same way.
-21. Run ruff with `ruff.toml`. Record the results.
-22. Run Archipelago's core unit tests (`python -m unittest discover -s test/general`) from
-    `_ignore_/ap-fuzz` with its venv, after task 20 has copied the fresh `.apworld` into
-    `custom_worlds/`. Run them with `-B` so no bytecode is written. Also run the apworld's own
-    tests, if any exist. Every failure that involves this world counts against the index's "must
-    pass all core unit tests" requirement.
+20. Run the fuzzer through `scripts/run_fuzzer.ps1`, following `docs/Running the Fuzzer.md` (run
+    `-Setup` first if needed). The script runs one pass per check, so that no hook masks
+    another, and archives each pass under `fuzz-env/ap-fuzz/fuzz_runs/<timestamp>/`.
+    - First run `-Pass canary`, in the foreground. It fuzzes a world that is broken on purpose and
+      must come back `ok` (meaning the expected failures were reported). If it does not, the
+      pipeline is hiding failures: file that as a finding, and treat every other fuzzer result in
+      this review as Unknown.
+    - Then start `-Pass all,determinism` in the background (the default `-Runs 500`). `all` is the
+      `rate` pass followed by one pass per counted hook. Only the `rate` pass gives the failure
+      rate; the check passes report findings, not a rate.
+    - The script passes `fuzz-meta/khimera_damg.yaml` by absolute path by default. If that file
+      is missing or not a YAML mapping, the run stops with a message; record it under "Not
+      verified" and rerun with `-NoMeta`.
+    - If the live rules from Phase 1 measure something the passes do not (a different
+      `--yamls_per_run`, another hook, a different way of adding Empty), record the exact
+      difference under "Not verified" and as an A8 finding.
+21. Run ruff with `ruff.toml` (`scripts/run_ruff.ps1` covers the apworld, its tests included).
+    Record the results.
+22. Run `scripts/run_tests.ps1 -All`: the apworld's own suite, then Archipelago's core suite scoped
+    to this world. Record the counts, every failure, and every skipped test with its reason. Then
+    run the full core suite as the index does, from `fuzz-env/ap-fuzz` with its venv, after task
+    20 has installed the fresh `.apworld` into `custom_worlds/`, using the command given in the
+    index section of `CLAUDE.md` (with `-B` and `-t .`). Every failure that involves this world
+    counts against the index's "must pass all core unit tests" requirement; failures in other
+    worlds are recorded under "Not verified" as environment problems.
 23. Open the built `.apworld` as a zip, read-only, without extracting it to disk. List its
     contents, read its packaged `archipelago.json`, confirm `patches/data.py` and the patch zips
     are present, and check for anything that should not ship.
@@ -344,10 +362,12 @@ Phase 5: User journeys
     message. Feed what you find into the relevant area's findings.
 
 Phase 6: Index readiness
-36. Collect the fuzzer results. If separate passes ran, compute the failure rate as the live rules
-    define it, and list failures by hook and by exception type, with a representative traceback
-    for each. If only the combined run from task 20 ran, mark the failure rate and every
-    per-hook check Unknown, and say why.
+36. Collect the fuzzer results from the run folders of task 20: each pass's `result.json` (counts,
+    rate, verdict, notes, top errors) and its `error/` folder. Check the `rate` pass's rate
+    against the live rules' definition rather than taking the script's verdict on trust, and list
+    failures by pass and by exception type, with a representative traceback for each. A pass
+    that ended `error` or `stalled`, or a canary that failed, makes the affected checks Unknown;
+    say why.
 37. Evaluate every live index requirement as Pass, Fail or Unknown, with the evidence for each.
     Any Fail on a hard requirement is also filed as a [Critical] finding.
 

@@ -5,11 +5,11 @@ param(
 )
 
 $Root        = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$FuzzRoot    = Join-Path $Root "_ignore_\ap-fuzz"
-$Clone       = Join-Path $Root "_ignore_\empty-apworld"
+$FuzzRoot    = Join-Path $Root "fuzz-env\ap-fuzz"
+$Clone       = Join-Path $Root "fuzz-env\empty-apworld"
 $WorldSource = Join-Path $Clone "empty"
 $FilesPy     = Join-Path $FuzzRoot "worlds\Files.py"
-$Stage       = Join-Path $Root "_ignore_\empty-build"
+$Stage       = Join-Path $Root "fuzz-env\empty-build"
 $OutputFile  = Join-Path $FuzzRoot "custom_worlds\empty.apworld"
 $StaticDir   = Join-Path $FuzzRoot "static_worlds"
 $StaticYaml  = Join-Path $StaticDir "empty.yaml"
@@ -19,7 +19,7 @@ if (-not (Test-Path $FilesPy)) {
     throw "Fuzzer worktree not found at $FuzzRoot. Run scripts\run_fuzzer.ps1 -Setup first."
 }
 
-# Everything here lives under _ignore_\, which the root .gitignore excludes wholesale, so unlike
+# Everything here lives under fuzz-env\, which the root .gitignore excludes wholesale, so unlike
 # the fuzzer clone in /fuzzer this one can keep its own .git and be pulled or re-pinned by hand.
 if ((Test-Path $Clone) -and $Force) {
     Remove-Item $Clone -Recurse -Force

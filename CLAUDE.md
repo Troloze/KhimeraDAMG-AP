@@ -20,6 +20,12 @@ apworld or the mod. Repository tooling no player ever runs — the PowerShell sc
 `scripts/`, the notes in `docs/` — is outside that rule, and anything an AI wrote there is
 marked as such (see rule 6).
 
+The apworld's test package, `worlds/khimera_damg/tests/`, is the one exception inside the
+apworld folder. `.apignore` keeps it out of the built `.apworld`, so no player ever receives or
+runs it, and it is written by the AI at the developer's request, every file carrying the rule 6
+header. Rule 1 still applies to it in full: each change to the tests needs its own permission.
+See "The apworld's test suite" below.
+
 1. **Never create, edit, rename, move, or delete any file in this repository** without
    explicit permission from the user for that specific change. There is no standing
    permission, even for things that won't be shipped (like documents and tests). Approval
@@ -52,7 +58,8 @@ marked as such (see rule 6).
 
 ## Repository layout
 
-- `worlds/khimera_damg/` — the apworld source (the thing being developed)
+- `worlds/khimera_damg/` — the apworld source (the thing being developed). Its `tests/` package
+  is development-only and never packaged; see "The apworld's test suite".
 - `Archipelago/` — submodule, a fork of Archipelago. Read it freely; never modify it.
 - `KhimeraDAMG-AP-Mod/` — submodule, the game-side mod. Same rule: read freely, never modify.
 - `docs/` — design notes: the communication contract, item/location conventions, the option
@@ -63,11 +70,12 @@ marked as such (see rule 6).
 - `fuzz-meta/` — option constraints for local fuzzer runs.
 - `todo` — tracked short-term task list; see "Task lists".
 
-Gitignored working folders, present on a configured clone and never committed: `python/`
-(standalone interpreter), `py-env/` (build venv), `build/` (apworld output), `_ignore_/`
-(fuzzer worktree), `fuzzer/` (fuzzer clone), `docs/report/` (landmark review reports, kept
-locally and never committed), and `testing/` (scratch tests — this folder is to stay gitignored
-permanently).
+Gitignored working folders, never committed: `python/` (standalone interpreter), `py-env/`
+(build venv), `build/` (apworld output), `fuzz-env/` (the fuzzer worktree `fuzz-env/ap-fuzz` and
+the `empty-apworld` clone, created by `scripts/run_fuzzer.ps1 -Setup`), `fuzzer/` (fuzzer clone),
+`docs/report/` (landmark review reports, kept locally and never committed), and `testing/`
+(scratch space for throwaway tests, created only when needed — this folder is to stay gitignored
+permanently). Real tests belong in `worlds/khimera_damg/tests/`, not here.
 
 ## Build and test environment
 
@@ -83,7 +91,7 @@ nothing tracked is ever written into either.
 **Allowed exception: writes by the Archipelago runtime that leave only ignored changes.** Code
 that ships with Archipelago writes files on its own whenever it runs from source. Those writes
 are allowed as long as every change they leave is ignored by the submodule's own `.gitignore`.
-Known examples, all of which land in `Archipelago/` or in the fuzzer worktree `_ignore_/ap-fuzz`:
+Known examples, all of which land in `Archipelago/` or in the fuzzer worktree `fuzz-env/ap-fuzz`:
 
 - `logs/Launcher_*.txt` and other log files, written by Archipelago's logging setup.
 - `host.yaml`, written by the settings module's autosave whenever settings are loaded.
@@ -178,10 +186,73 @@ loads the world with no version or metadata, and from core 0.7.0 on it will refu
 - The installed build's core version is the one that matters for compatibility. Check
   `C:\ProgramData\Archipelago\manifest.json` rather than assuming it matches the submodule;
   the two routinely differ.
-- `scripts/run_ruff.ps1` lints the apworld. `scripts/run_fuzzer.ps1` runs the fuzzer; see
-  "Running the fuzzer" below.
+- `scripts/run_tests.ps1` runs the apworld's own tests and, with `-Core`, Archipelago's core
+  suite; see "The apworld's test suite" below. `scripts/run_ruff.ps1` lints the apworld, tests
+  included. `scripts/run_fuzzer.ps1` runs the fuzzer; see "Running the fuzzer" below.
 - Building, copying, and generating all write files. Propose the commands and wait to be
-  asked, the same as any other change.
+  asked, the same as any other change. Running the tests is read-only for this repository (see
+  below), so it falls under rule 3.
+
+### The apworld's test suite
+
+    scripts/run_tests.ps1                    # the apworld's own tests
+    scripts/run_tests.ps1 -Area client       # one folder: generation, client or guards
+    scripts/run_tests.ps1 -Filter "*ack*"    # only tests whose name matches (unittest -k)
+    scripts/run_tests.ps1 -Core              # Archipelago's test/general, scoped to this world
+    scripts/run_tests.ps1 -All               # the apworld's tests, then the core suite
+
+`-Detailed` prints one line per test and `-Durations` the ten slowest. The script exits non-zero
+when anything fails. At the time of writing the suite holds 470 tests (generation 230, client
+216, guards 24) and runs in about two seconds; the scoped core suite adds 253.
+
+The tests are plain stdlib `unittest`, run with the `py-env` venv, with Archipelago imported from
+the submodule and the apworld reached through the junction at `Archipelago/worlds/khimera_damg`.
+They write nothing into this repository or either submodule: the script runs them from a
+throwaway folder under `TEMP`, seeded with a copy of the submodule's `host.yaml` so the settings
+module does not autosave one into `Archipelago/`, and sets `PYTHONDONTWRITEBYTECODE` so no
+`__pycache__/` appears through the junction. `AP_TEST_WORLDS=khimera_damg` keeps every other world
+out of the run. After a run, `git -C Archipelago status` should still be clean.
+
+Layout of `worlds/khimera_damg/tests/`, one folder per kind of test:
+
+- `generation/` — the world: item table and pool (traps, classification overrides, item links),
+  location table and layout, the region graph and its access rules, options (every one of the 16
+  shuffle combinations through `test.param.classvar_matrix`, each also running Archipelago's own
+  `WorldTestBase` checks), and slot data.
+- `client/` — the client, with no server, game, network or thread involved: storage (including
+  path containment on import), the v1 contract's documents, validators and state flags, the
+  `AgentV1` tick methods, connection state (death links, acks, the cctx and li builders), the
+  interface, and the patcher.
+- `guards/` — repository invariants: the manifest and the four version places, packaging
+  (`.apignore` excludes the tests and nothing else, referenced files exist, patch zips use forward
+  slashes, every shared field is read by the mod), and Python 3.11 compatibility (sources parse,
+  and no standard library name newer than 3.11 is used).
+- `support/` — `sandbox.py` points `Utils.user_path("khimera_damg")` and the game sandbox at
+  temporary folders for every client test, and fails the test if that redirection did not take;
+  `fakes.py` holds the builders and stand-ins (connection contexts, agents wired without a thread,
+  network items).
+- `bases.py` — `KhimeraTestBase` and the option presets. It must not import the client package.
+
+Conventions the suite follows, and new tests should too:
+
+- Every assertion carries a message saying what triggered it, usually the option combination
+  (`option_description()`), so a failure explains itself without a debugger.
+- Tables of expected values are deliberate tripwires: `EXPECTED_COUNTS` and `EXPECTED_OPTION_KEYS`
+  in `generation/test_options.py`, `EXPECTED_RULE_LOCATIONS` in `generation/test_locations.py`.
+  An intended change to the world updates the table in the same change.
+- There is no expected-failure mechanism. A red test is either a bug or a table to update.
+- Two groups skip rather than fail when their input is missing: the patcher tests that need
+  `patches/data.py` (run a build first) and the mod field parity check (needs the
+  `KhimeraDAMG-AP-Mod` submodule checked out).
+- The tests import Archipelago's own `test` package (`test.bases`, `test.general`, `test.param`),
+  which a player's installation does not have. That is one more reason the package is
+  apignored, and the packaging guard checks that it stays so.
+- The code style below applies to the tests as to the rest of the apworld; `run_ruff.ps1`
+  lints them.
+
+`-Core` runs the core suite against the source through the junction, which is quick and catches
+logic problems. The index requirement is about the built `.apworld`; see "Hard requirements for
+inclusion" for that check.
 
 ### Four places carry a version
 
@@ -262,8 +333,8 @@ Any usage of ruff rule skipping comments such as `# noqa` and `# ruff: disable[]
 `# ruff: enable[]` is to be viewed as a deliberate choice by the user to go against
 the style rules, and should be allowed.
 
-**The standards above apply only to code *within* the apworld.** Scratch tests under
-`testing/` do not need to meet them.
+**The standards above apply only to code *within* the apworld**, which includes
+`worlds/khimera_damg/tests/`. Scratch tests under `testing/` do not need to meet them.
 
 ## Archipelago correctness rules
 
@@ -318,8 +389,14 @@ them as a standing checklist, raise any violation you find, and report index rea
   global `random` module is called out by name (see the correctness rules above), as are test
   failures "deemed problematic".
 - **The world must pass all core unit tests.** Run Archipelago's own suite with the built
-  `.apworld` in `custom_worlds/` (for example `python -m unittest discover -s test/general` from
-  the fuzzer worktree). A failure there blocks inclusion on its own, separately from the fuzzer.
+  `.apworld` in `custom_worlds/`: from the fuzzer worktree `fuzz-env/ap-fuzz`, after
+  `run_fuzzer.ps1` has installed the fresh build, run
+  `.venv\Scripts\python.exe -B -m unittest discover -s test/general -t .` (about 90 seconds, every
+  world). The `-t .` is required: without it unittest imports the test modules as top-level
+  modules instead of `test.general.*`, and nine of them fail to import whatever the world does.
+  A failure there blocks inclusion on its own, separately from the fuzzer.
+  `scripts/run_tests.ps1 -Core` is the quick source-tree version of the same suite, scoped to
+  this world.
 - **Generation failure rate below 1%**, measured with Eijebong's fuzzer, not counting
   `OptionError`s. It is measured with `empty-apworld` (<https://github.com/ionium-ap/empty-apworld>,
   100 free locations) present in the same multiworld, so that failures caused by a restrictive
@@ -363,22 +440,45 @@ Run at merge time and worth passing, but not counted toward the 1%:
 ### Running the fuzzer
 
 The workflow is established and scripted. `docs/Running the Fuzzer.md` is the full runbook; in
-short, `scripts/run_fuzzer.ps1 -Setup` once, then `scripts/run_fuzzer.ps1` per run.
+short, `scripts/run_fuzzer.ps1 -Setup` once, then `scripts/run_fuzzer.ps1 -Pass <pass>` per run.
 
-It never writes inside `Archipelago/`: it fuzzes a detached git worktree of the submodule under
-`_ignore_/ap-fuzz` and clones the fuzzer itself into `fuzzer/`, both gitignored. Each run builds
+It never writes inside `Archipelago/`: it fuzzes a detached git worktree of the submodule at
+`fuzz-env/ap-fuzz` and clones the fuzzer itself into `fuzzer/`, both gitignored. Each run builds
 a real `.apworld` through `scripts/build_apworld.ps1` and drops it into that worktree's
 `custom_worlds/`, because a directory link there is not importable — only `.apworld` zips get
 registered by Archipelago's meta-path finder.
 
-Default invocation, for reference:
-`fuzz.py -r 500 -j 16 -g khimera_damg -n 1 --skip-output`, plus `--hook` for all six counted
-hooks, which `run_fuzzer.ps1` always appends. Per the section above, that combined run cannot
-report a failure, so it is not evidence of the 1% rate; `docs/Running the Fuzzer.md` covers how
-to run passes that are. Flags: `-r` generations (mandatory), `-j` parallel jobs, `-g` world
-(repeatable), `-n` YAMLs per generation, `-t` timeout, `-m` fuzz-meta file, `--hook
-module:class`, `--skip-output` stops before `generate_output`. Output lands in
-`_ignore_/ap-fuzz/fuzz_output`.
+Before every run (and during `-Setup`), `Sync-FuzzWorktree` in `run_fuzzer.ps1` checks the
+worktree against the commit the `Archipelago` submodule has checked out. If they differ it checks
+the worktree out at the submodule's commit, reinstalls the worktree's requirements into its venv
+and rebuilds `empty.apworld`, so the apworld is always fuzzed on the core it was built against.
+The two share the submodule's object store, so nothing is fetched. It refuses, and the run stops,
+if the worktree has changes to tracked files. Creating or moving that worktree changes git state
+in it, but never in `Archipelago/` itself.
+
+The script runs one `fuzz.py` invocation per pass, following the rules above, through
+`scripts/fuzzer/run_fuzz_pass.ps1`, which holds the pass table:
+
+- `rate` (the default) — no checking hook, output not skipped, Empty in every generation through
+  `with_empty`. The only pass whose numbers are the index's failure rate; it fails at 1% or more.
+- One pass per counted hook, named after it, each loading that hook alone (plus `with_empty`,
+  except `gerpocalypse`). `detect_output_placement_changes` runs without `--skip-output`; the
+  others skip it. Any failure in a check pass is a finding.
+- `determinism`, with half the jobs and twice the timeout. `checks` runs the six counted passes,
+  `all` runs `rate` then `checks`.
+- `canary` — builds a world that is broken on purpose (`scripts/fuzzer/build_canary_apworld.ps1`),
+  expects the `rate` and `item_location_count` passes over it to fail, and removes it afterwards.
+  A canary that passes means the pipeline is hiding failures again.
+
+Defaults: `-Runs 500 -Jobs 16 -Yamls 1 -Timeout 15`, with `fuzz-meta/khimera_damg.yaml` passed as
+an absolute path unless `-NoMeta`. Each pass is archived to
+`fuzz-env/ap-fuzz/fuzz_runs/<timestamp>/<pass>/` (command line, fuzz.py's own output, and a
+`result.json`), with a `run.json` recording the apworld hash and the three commits involved. The
+script exits non-zero when any pass is not `ok`. `fuzz.py` flags, for reference: `-r` generations
+(mandatory), `-j` parallel jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout,
+`-m` fuzz-meta file, `--hook module:class`, `--skip-output` stops before `generate_output`,
+`--dump-ignored`, `--with-static-worlds`, `--max-tasks-per-child`, `--stall-timeout`. `fuzz.py`
+itself writes to `fuzz-env/ap-fuzz/fuzz_output` and wipes it at the start of every run.
 
 ### Index entry format, for when 0.1.0 ships
 
@@ -396,11 +496,11 @@ keeps its own copy at `fuzz-meta/khimera_damg.yaml` for local runs, passed with 
 `-m` flag. It uses the same path the index expects, so it can be copied across if the index ever
 needs one — but the index's copy is separate, and a change here has to be mirrored there.
 
-The file is currently comments only, so `yaml.safe_load` returns `None` and passing it with `-m`
-crashes the fuzzer (`'NoneType' object has no attribute 'get'`) before any generation. It needs
-at least an empty mapping keyed by the game name before it can be used. `fuzz.py` also runs from
-`_ignore_/ap-fuzz`, so a relative `fuzz-meta/...` path does not resolve there; pass an absolute
-path.
+The file holds an empty mapping under the quoted game name and no constraints. That key has to
+stay: a file with no mapping at all loads as `None`, and the fuzzer crashes with
+`'NoneType' object has no attribute 'get'` before any generation. `fuzz.py` runs from
+`fuzz-env/ap-fuzz`, so a relative `fuzz-meta/...` path does not resolve there; `run_fuzzer.ps1`
+passes the absolute path itself.
 
 ## Other information
 

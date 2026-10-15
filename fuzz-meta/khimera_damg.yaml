@@ -13,7 +13,9 @@
 # just places no traps. Add fuzz_constraints here (mutually_exclusive,
 # if_selected/must_include, etc. -- see the fuzzer README) once that stops being true.
 #
-# Not usable with -m yet: a comment-only file loads as None, and the fuzzer crashes on it with
-# "'NoneType' object has no attribute 'get'" before any generation. It needs at least an empty
-# mapping keyed by the game name first. fuzz.py runs from _ignore_/ap-fuzz, so pass this file's
-# absolute path.
+# The game key below has to stay even while it is empty: a file with no mapping at all loads as
+# None, and the fuzzer then crashes with "'NoneType' object has no attribute 'get'" before any
+# generation. The key is quoted because the game name contains a colon. fuzz.py runs from
+# _ignore_/ap-fuzz, so pass this file's absolute path; scripts/run_fuzzer.ps1 does that itself.
+
+"Khimera: Destroy All Monster Girls": {}
