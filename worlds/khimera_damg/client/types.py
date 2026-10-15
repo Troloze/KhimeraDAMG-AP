@@ -79,77 +79,19 @@ class RuntimeInformation:
             "is_win":           self.is_win,
         }
 
-    def merge(self, merger: RuntimeInformation | None, merger_old: bool = False) -> RuntimeInformation:
+    def merge_messages(self, merger: RuntimeInformation | None, merger_old: bool = False) -> RuntimeInformation:
         if merger is None:
             return self
-        if merger.locations is not None:
-            self.locations = (self.locations or set()) | merger.locations
-        if merger.location_acks is not None:
-            self.location_acks = (self.location_acks or set()) | merger.location_acks
-        self.is_win = bool(self.is_win or merger.is_win)
         if merger_old:  # merger has older information
-            # if self is not None, maintain
-            if self.ack is None:
-                self.ack = merger.ack
-            # if self is not None, maintain
-            if (
-                self.death_ack is None and
-                merger.death_ack is not None and
-                not merger.death_ack == -1
-            ):
-                self.death_ack = merger.death_ack
-            # if self is not None, maintain
-            if self.death_link is None:
-                self.death_link = merger.death_link
-            if merger.item_list is not None:
-                self.item_list = (
-                    merger.item_list +
-                    [entry for entry in (self.item_list or []) if entry not in merger.item_list]
-                )
-            if merger.data_acks is not None:
-                self.data_acks = (
-                    merger.data_acks +
-                    [entry for entry in (self.data_acks or []) if entry not in merger.data_acks]
-                )
             if merger.messages is not None:
                 self.messages = (
                     merger.messages +
                     [entry for entry in (self.messages or []) if entry not in merger.messages]
                 )
-            if self.data is None:
-                # Only allow new information, whatever is lost will be re-sent.
-                self.data = merger.data
-                pass
         else:  # merger has newer information
-            # if merger is not None, overwrite
-            if merger.ack is not None:
-                self.ack = merger.ack
-            # if merger is not None, overwrite
-            if (
-                merger.death_ack is not None and
-                not merger.death_ack == -1
-            ):
-                self.death_ack = merger.death_ack
-            # if merger is not None, overwrite
-            if merger.death_link is not None:
-                self.death_link = merger.death_link
-            if merger.item_list is not None:
-                self.item_list = (
-                    [entry for entry in (self.item_list or []) if entry not in merger.item_list] +
-                    merger.item_list
-                )
-
-            if merger.data_acks is not None:
-                self.data_acks = (
-                    [entry for entry in (self.data_acks or []) if entry not in merger.data_acks] +
-                    merger.data_acks
-                )
             if merger.messages is not None:
                 self.messages = (
                     [entry for entry in (self.messages or []) if entry not in merger.messages] +
                     merger.messages
                 )
-            if merger.data is not None:
-                # Only allow new information, whatever is lost will be re-sent.
-                self.data = merger.data
         return self

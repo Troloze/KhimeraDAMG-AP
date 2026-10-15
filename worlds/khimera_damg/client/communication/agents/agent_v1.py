@@ -427,11 +427,10 @@ class AgentV1(CommunicationAgent):
         self._write_file("ap.li", message)
 
     def _send_host_information(self, hi: RuntimeInformation) -> None:
-        hi = hi.merge(self.host_information_buffer, merger_old=True)
-        cap = self.contract.max_messages_per_tick
+        hi = hi.merge_messages(self.host_information_buffer, merger_old=True)
 
         if hi.messages is not None:
-            hi.messages = hi.messages[-cap:]
+            hi.messages = hi.messages[-self.contract.max_messages_per_tick:]
         self.host_information_buffer = hi
 
         if not (
@@ -540,7 +539,10 @@ class AgentV1(CommunicationAgent):
         with self.context_lock:
             context_copy = self.connection_context
 
-        locations: set[int] | None = set(l_ids) if (l_ids := message.get("location_ids")) is not None else None
+        locations: set[int] | None = None
+        lids = message.get("location_ids")
+        if lids is not None:
+            locations = {int(lid) for lid in lids}
         death_data: dict[str, Any] | None = message.get("death_link")
         death_link: tuple[str, int, str] | None = None
         data: list[tuple[int, str, Any]] | None = message.get("data")
@@ -552,11 +554,15 @@ class AgentV1(CommunicationAgent):
         ):
             # We receive a structure, not the built message,
             # so we have to insert the slot name here.
-
             dl_msg: str = death_data.get("message", "").replace("%s", context_copy.slot_name)
             death_link = (context_copy.slot_name, int(death_data["id"]), dl_msg)
-        location_acks: set[int] | None = set(l_ids) if (l_ids := message.get("location_acks")) is not None else None
-        death_ack: int | None = message.get("death_ack")
+
+        location_acks: set[int] | None = None
+        lacks = message.get("location_acks")
+        if lacks is not None:
+            location_acks = {int(lack) for lack in lacks}
+
+        death_ack: int | None = int(dack) if (dack := message.get("death_ack")) is not None else None
         _exit_code: int | None = game_information.get("exit_code")  # Currently does nothing
         if len(raw) > 1:
             # we can only ever have 2 entries here
@@ -568,8 +574,10 @@ class AgentV1(CommunicationAgent):
                 message_ = game_information_.get("message")
                 if message_ is None:
                     raise GetOutOfHereError
-                locations_: set[int] | None = \
-                    set(l_ids) if (l_ids := message_.get("location_ids")) is not None else None
+                locations_: set[int] | None = None
+                lids_ = message_.get("location_ids")
+                if lids_ is not None:
+                    locations_ = {int(lid_) for lid_ in lids_}
                 if locations_ is not None:
                     locations = (locations or set()) | locations_
                 if death_link is None:  # Prioritize the newer
@@ -582,11 +590,13 @@ class AgentV1(CommunicationAgent):
                     ):
                         dl_msg_: str = death_data_.get("message", "").replace("%s", context_copy.slot_name)
                         death_link = (context_copy.slot_name, int(death_data_["id"]), dl_msg_)
-                location_acks_: set[int] | None = \
-                    set(l_ids) if (l_ids := message_.get("location_acks")) is not None else None
+                location_acks_: set[int] | None = None
+                lacks_ = message_.get("location_acks")
+                if lacks_ is not None:
+                    location_acks_ = {int(lack_) for lack_ in lacks_}
                 if location_acks_ is not None:
                     location_acks = (location_acks or set()) | location_acks_
-                death_ack_: int | None = message_.get("death_ack")
+                death_ack_: int | None = int(dack_) if (dack_ := message_.get("death_ack")) is not None else None
                 if death_ack_ is not None:
                     # Prioritize the newer
                     death_ack = death_ack if death_ack is not None else death_ack_

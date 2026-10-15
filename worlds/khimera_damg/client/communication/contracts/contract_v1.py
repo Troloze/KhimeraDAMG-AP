@@ -106,7 +106,7 @@ class OptionDataHandler:
                 new_d = {}
                 for e, v in value.items():
                     e_ = normalize_and_sanitize(e)
-                    if isinstance(v, int):
+                    if isinstance(v, (int, float)):
                         new_d[e_] = v
                     elif isinstance(v, str):
                         new_d[e_] = normalize_and_sanitize(v)
@@ -194,7 +194,7 @@ class OptionDataHandler:
                 new_d = {}
                 for e, v in value.items():
                     e_ = normalize_and_sanitize(e)
-                    if isinstance(v, int):
+                    if isinstance(v, (int, float)):
                         new_d[e_] = normalize_number(v)
                     elif isinstance(v, str):
                         new_d[e_] = normalize_and_sanitize(v)

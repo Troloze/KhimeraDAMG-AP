@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import subprocess
+import time
 import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,6 +19,8 @@ from .storage import KhimeraDAMGStorageHandler
 if TYPE_CHECKING:
     import kvui  # type: ignore
 
+    from .client import KhimeraDAMGContext  # Will cause a circular import normally
+
 logger = logging.getLogger("Client")
 
 
@@ -31,8 +34,9 @@ class GameNotFoundError(LauncherError):
 
 # Unimplemented Skeleton, deliberately does not work.
 class KhimeraDAMGLauncher:
-    def __init__(self) -> None:
+    def __init__(self, ctx: KhimeraDAMGContext) -> None:
         self.pid: int | None = None
+        self.ctx: KhimeraDAMGContext = ctx
         self.process: psutil.Process | None = None
         self.process_creation_time: float | None = None
         self.address: str | None = None
@@ -73,16 +77,18 @@ class KhimeraDAMGLauncher:
                     msg.open()
                 raise err2
 
+        self.ctx.reset_connection_state()
         logger.info("Launching game...")
         game_folder = KhimeraDAMGStorageHandler.get_path_raw(folder="loaded_patch")
-        process = psutil.Popen([str(game_folder / executable_name), "--apw_launcher"], cwd=game_folder)
+        uid = int(time.time())  # Safe for around 285.4 million years! (since August 15 2026, 00h18 UTC-3).
+        process = psutil.Popen([str(game_folder / executable_name), f"--launcher_uid={uid}"], cwd=game_folder)
 
-        time = process.create_time()
+        c_time = process.create_time()
         url = urllib.parse.urlparse(host_address)
 
         self.pid = process.pid
         self.process = process
-        self.process_creation_time = time
+        self.process_creation_time = c_time
         self._tracking = True
         self.address = f"{url.scheme}://{url.netloc.rpartition('@')[2]}"
         self.apw_version = APWORLD_VERSION
@@ -221,10 +227,10 @@ class KhimeraDAMGLauncher:
         try:
             entry = psutil.Process(pid)
             name = Path(entry.exe()).name
-            time = entry.create_time()
+            c_time = entry.create_time()
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return False, None
-        return name == executable_name and time == creation_time, entry
+        return name == executable_name and c_time == creation_time, entry
 
     def update_launcher_state(self) -> bool:
         connected, _ = self.probe_game_status(launcher=self)

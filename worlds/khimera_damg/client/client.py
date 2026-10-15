@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 def get_game_id(slot: str, seed: str) -> str:
-    return hashlib.md5(f"{slot}_{seed}".encode("utf-8")).hexdigest()
+    return hashlib.md5(f"{slot}_{seed}".encode()).hexdigest()
 
 
 class KhimeraDAMGJSONToTextParser(JSONtoTextParser):
@@ -345,7 +345,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                     logger.info("Note: This will not delete the currently loaded game data.")
                 logger.info("Send /confirm again in order to wipe the game data. (LAST WARNING)")
                 return True
-            elif self.continue_context == "wipe_":
+            if self.continue_context == "wipe_":
                 # Wipe everything.
                 g_id = None if self.continue_args is None else self.continue_args.get("g_id")
                 KhimeraDAMGStorageHandler.wipe(g_id)
@@ -398,7 +398,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
                     self.continue_context = None
                     self.continue_time = None
                     self.continue_args = None
-        
+
 
 class KhimeraDAMGConnectionState:
     def __init__(self, ctx: KhimeraDAMGContext) -> None:
@@ -427,6 +427,8 @@ class KhimeraDAMGConnectionState:
             self._goal_status_ready = None
             self.pending_acked_data = None
             self.last_ack = 0
+            self.req_cctx = None
+            self.req_li = None
 
     def get_game_deathlink(self) -> tuple[str, int, str] | None:
         with self.lock:
@@ -546,7 +548,7 @@ class KhimeraDAMGContext(CommonContext):
 
     def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
         super().__init__(server_address, password)
-        self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher()
+        self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher(ctx=self)
         self.slot_data: dict[str, Any] = {}
         self.communication_interface: KhimeraDAMGCommunicationInterface | None = None
         self.interface_start = None
@@ -606,7 +608,7 @@ class KhimeraDAMGContext(CommonContext):
             self.connection_state.set_item_ack(game_package.ack)
             if game_package.ack > last_ack:
                 if self.game_id is not None:
-                    KhimeraDAMGStorageHandler.store("last_ack", last_ack, self.game_id, folder="game_data")
+                    KhimeraDAMGStorageHandler.store("last_ack", game_package.ack, self.game_id, folder="game_data")
 
         if game_package.req_cctx is not None:
             self.cctx = self._make_cctx()
@@ -718,7 +720,10 @@ class KhimeraDAMGContext(CommonContext):
             self.communication_task = None
 
     def _make_cctx(self) -> ConnectionContext:
-        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
+        last_ack = max(
+            self.connection_state.get_last_ack(),
+            KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
+        )
         items = self.items_received  # Accessed asynchronously, state can change between a loop's readings
         item_list = [(i + 1, items[i]) for i in range(0, len(items))]
         win_status = self.stored_data.get(f"_read_client_status_{self.team}_{self.slot}")
@@ -768,13 +773,10 @@ class KhimeraDAMGContext(CommonContext):
             self.communication_interface is not None and
             not self.communication_interface.authenticate(self.slot_name, self.host_seed)
         ):
-            # Different seed/slot, requires restarting everything
+            # Different seed/slot, requires restarting communication
+            # Connection state is reset by launcher, so no need to do it here.
             await self.communication_interface.stop()
             self.communication_interface = None
-            self.connection_state.reset()
-
-        # Insert game quitting logic
-        # If game is open open a popup prompting the user for confirmation
 
         # Launch game first!
         if not self.launcher.tracking:
@@ -787,6 +789,7 @@ class KhimeraDAMGContext(CommonContext):
                 )
             except Exception:
                 logger.exception("Khimera launch failed; server connection remains active.")
+                return
 
         # Wait for win status
         try:
@@ -957,6 +960,11 @@ class KhimeraDAMGContext(CommonContext):
 
     async def disconnect(self, allow_autoreconnect: bool = False) -> None:
         await super().disconnect(allow_autoreconnect)
+
+    def reset_connection_state(self) -> None:
+        self.connection_state.reset()
+        last_ack = KhimeraDAMGStorageHandler.get("last_ack", self.game_id, 0, folder="game_data")  # type: ignore
+        self.connection_state.set_item_ack(last_ack)
 
     async def connection_closed(self) -> None:
         self.game_id = None
