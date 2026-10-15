@@ -16,6 +16,7 @@ def create_option_groups() -> list[OptionGroup]:
 
 
 def adjust_option_values(world: "KhimeraDAMGWorld") -> None:
+    # Used for handling inconsistent option combinations, currently a stub.
     pass
 
 

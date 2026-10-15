@@ -39,8 +39,10 @@ class APWorldVersionTooLowError(PatcherError):
 class SourceNotFoundError(PatcherError):
     pass
 
+
 class FailedToBuildError(PatcherError):
     pass
+
 
 class PatchNotFoundError(PatcherError):
     pass
