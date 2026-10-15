@@ -8,6 +8,7 @@ from contextlib import suppress
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, ClassVar
 
+
 import Utils  # type: ignore
 from CommonClient import (  # type: ignore
     ClientCommandProcessor,
@@ -22,6 +23,7 @@ from CommonClient import (  # type: ignore
 from NetUtils import JSONMessagePart, JSONtoTextParser, NetworkItem  # type: ignore
 
 from .. import APWORLD_VERSION, GAME_FULL_NAME
+from . import dialog
 from .communication import KhimeraDAMGCommunicationInterface
 from .launcher import KhimeraDAMGLauncher
 from .patcher import SourceNotFoundError, source_get, try_load_build, validate_version
@@ -145,7 +147,7 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
 
         async def importer(command_processor: KhimeraDAMGCommandProcessor) -> None:
             try:
-                file_name = await asyncio.to_thread(
+                file_name = await dialog.run(
                     Utils.open_filename,
                     "Import game data",
                     [("Khimera DAMG data", [".kdamgdata"])]

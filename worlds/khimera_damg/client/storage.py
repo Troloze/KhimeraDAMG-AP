@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import shutil
@@ -11,6 +10,7 @@ import Utils  # type: ignore
 import yaml
 
 from .. import GAME_ID
+from . import dialog
 
 
 class KhimeraDAMGStorageHandler:
@@ -97,7 +97,7 @@ class KhimeraDAMGStorageHandler:
     async def save_data(cls, file_name: str) -> bool:
         if not cls.probe_data(file_name):
             return False
-        file_path = await asyncio.to_thread(
+        file_path = await dialog.run(
             Utils.save_filename,
             "Export game data as...",
             [("Khimera DAMG data", [".kdamgdata"])],

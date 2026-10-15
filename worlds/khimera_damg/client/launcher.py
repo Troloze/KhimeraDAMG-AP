@@ -13,6 +13,7 @@ import psutil
 import Utils  # type: ignore
 
 from .. import APWORLD_VERSION
+from . import dialog
 from .patcher import FailedToBuildError, SourceNotFoundError, executable_name, load_patch, try_load_build
 from .storage import KhimeraDAMGStorageHandler
 
@@ -311,7 +312,7 @@ class KhimeraDAMGLauncher:
             auto_dismiss=True
         )
 
-        folder_prompt = asyncio.to_thread(
+        folder_prompt = dialog.run(
             Utils.open_directory,
             "Open vanilla build"
         )
