@@ -599,6 +599,7 @@ class KhimeraDAMGContext(CommonContext):
         self.cctx: ConnectionContext | None = None
         self.li: LocationInformation | None = None
         self._connection_task: asyncio.Task | None = None
+        self._goal_status_ready: asyncio.Event | None = None
         self._connection_gui_bypass: bool = False
         self._kvui_started: bool = False
 
@@ -846,10 +847,11 @@ class KhimeraDAMGContext(CommonContext):
             self.communication_interface = None
 
         # Wait for win status
-        try:
-            await asyncio.wait_for(self._goal_status_ready.wait(), timeout=1.0)
-        except TimeoutError:
-            logger.warning("Server took too long to send win information, starting anyways.")
+        if self._goal_status_ready is not None:
+            try:
+                await asyncio.wait_for(self._goal_status_ready.wait(), timeout=1.0)
+            except TimeoutError:
+                logger.warning("Server took too long to send win information, starting anyways.")
 
         # Start
         if self.communication_interface is None:
@@ -1000,8 +1002,6 @@ class KhimeraDAMGContext(CommonContext):
             return
         # Ask the host to notify the client if the game has goaled
         self.set_notify(f"_read_client_status_{self.team}_{self.slot}")
-        # Goal status event that triggers when the server provides the goal status.
-        self._goal_status_ready = asyncio.Event()
 
         if self.slot_data["options"]["death_link"]:
             # Set death link up if enabled.
@@ -1017,6 +1017,8 @@ class KhimeraDAMGContext(CommonContext):
         if cmd == "RoomInfo":
             self.host_seed = args.get("seed_name")
         elif cmd == "Connected":
+            # Goal status event that triggers when the server provides the goal status.
+            self._goal_status_ready = asyncio.Event()
             self._connection_task = asyncio.create_task(
                 self._on_connected(args),
                 name="kdamg_client_connection_routine"
