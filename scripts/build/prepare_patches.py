@@ -107,8 +107,8 @@ except TypeError as err:
 
 def make_source(name: str, hash_id: str, size: int, total_size: int, file_names: list[str], files_hash_id: str) -> str:
     return (
-        f'SourceData(name="{name}", hash_id="{hash_id}", size={size}, '
-        f'total_size={total_size}, file_names={file_names}, files_hash_id="{files_hash_id}")'
+        f"SourceData(name=\"{name}\", hash_id=\"{hash_id}\", size={size}, "
+        f"total_size={total_size}, file_names={file_names}, files_hash_id=\"{files_hash_id}\")"
     )
 
 
@@ -122,31 +122,30 @@ def make_patch(
 ) -> str:
 
     return (
-        f'PatchData(name="{name}", hash_id="{hash_id}", size={size}, '
-        f'source="{source}", version="{version}", version_id={version_id!s})'
+        f"PatchData(name=\"{name}\", hash_id=\"{hash_id}\", size={size}, "
+        f"source=\"{source}\", version=\"{version}\", version_id={version_id!s})"
     )
 
 
 def make_version(name: str, name_id: tuple[int, int, int], builds: list[str]) -> str:
     # json.dumps will print the list of string with double quotes instead of single quotes.
-    return f'ModVersionData(name="{name}", name_id={name_id!s}, builds={json.dumps(builds)})'
+    return f"ModVersionData(name=\"{name}\", name_id={name_id!s}, builds={json.dumps(builds)})"
 
 
 def make_builds_map() -> str:
     output = "builds: dict[str, SourceData] = {\n"
     entries: list[str] = []
     for name, data in unique_build_data.items():
+        source = make_source(
+            name,
+            data["hash"],
+            data["size"],
+            data["total_size"],
+            data["file_list"],
+            data["total_hash"]
+        )
         entries.append(
-            f'    "{name}": {
-                make_source(
-                    name,
-                    data["hash"],
-                    data["size"],
-                    data["total_size"],
-                    data["file_list"],
-                    data["total_hash"]
-                )
-            }'
+            f"    \"{name}\": {source}"
         )
     output += ",\n".join(entries)
     output += "\n}\n"
@@ -161,14 +160,15 @@ def make_patches_map() -> str:
         if len(ver_id) != 3:
             # Shouldn't happen, but I do this for the type checker know it is a tuple of size 3.
             raise ValueError("This error should not happen at this point")
-        entries.append(f'    "{name}": {make_patch(
+        patch = make_patch(
             name,
             data["hash"],
             data["size"],
             data["build"],
             data["version"],
             ver_id
-        )}')
+        )
+        entries.append(f"    \"{name}\": {patch}")
     output += ",\n".join(entries)
     output += "\n}\n"
     return output
@@ -183,7 +183,7 @@ def make_mod_versions_map() -> str:
             # Shouldn't happen, but I do this for the type checker know it is a tuple of size 3.
             raise ValueError("This error should not happen at this point")
         builds = list(value.keys())
-        entries.append(f'    "{key}": {make_version(key, ver_id, builds)}')
+        entries.append(f"    \"{key}\": {make_version(key, ver_id, builds)}")
     output += ",\n".join(entries)
     output += "\n}\n"
     return output
@@ -195,7 +195,7 @@ def make_patch_map_map() -> str:
     for name, data in unique_patch_data.items():
         ver_id = tuple([int(v) for v in data["version"].split(".")])
         build = data["build"]
-        entries.append(f'    ({ver_id}, "{build}"): patches["{name}"]')
+        entries.append(f"    ({ver_id}, \"{build}\"): patches[\"{name}\"]")
     output += ",\n".join(entries)
     output += "\n}\n"
     return output

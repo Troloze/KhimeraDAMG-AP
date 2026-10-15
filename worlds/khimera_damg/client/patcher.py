@@ -129,7 +129,7 @@ def _get_mod_version(host_version: str) -> tuple[int, int, int]:
     # It's ok for this to stay suboptimal.
     mod_digits: tuple[int, int, int] | None = max((k for k in apworld_to_mod_map if k <= digits), default=None)
     if mod_digits is None:
-        raise ValueError(f'Version "{host_version}" is not valid')
+        raise ValueError(f"Version \"{host_version}\" is not valid")
 
     return apworld_to_mod_map[mod_digits]
 
@@ -139,7 +139,7 @@ def _get_source_map(mod_version: tuple[int, int, int]) -> dict[str, str]:
     # It's ok for this to stay suboptimal.
     key: tuple[int, int, int] | None = max((k for k in source_map if k <= mod_version), default=None)
     if key is None:
-        raise ValueError(f'Version "{mod_version}" is not valid')
+        raise ValueError(f"Version \"{mod_version}\" is not valid")
     return source_map[key]
 
 
