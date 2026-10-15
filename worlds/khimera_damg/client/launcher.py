@@ -268,7 +268,7 @@ class KhimeraDAMGLauncher:
         description: str,
         buttons: tuple[str, ...],
         *,
-        auto_dismiss: bool = False
+        auto_dismiss: bool = True
     ) -> str | None:
         if not Utils.is_kivy_running():
             return None
@@ -282,7 +282,7 @@ class KhimeraDAMGLauncher:
             if not future.done():
                 future.set_result(action)
 
-        prompt = kvui.ButtonsPrompt(title, description, on_action, *buttons, auto_dismiss=False)
+        prompt = kvui.ButtonsPrompt(title, description, on_action, *buttons, auto_dismiss=auto_dismiss)
         prompt.open()
 
         try:
@@ -295,7 +295,7 @@ class KhimeraDAMGLauncher:
         title: str,
         description: str,
         *,
-        auto_dismiss: bool = False,
+        auto_dismiss: bool = True,
         error: bool = False
     ) -> kvui.MessageBox | None:
         if not Utils.is_kivy_running():
@@ -308,26 +308,39 @@ class KhimeraDAMGLauncher:
     async def _prompt_build_directory(self) -> Path | None:
         loading_message = self._message(
             "Waiting for a build",
-            "Please select the folder of a \"Khimera: Destroy All Monster Girls\" build",
-            auto_dismiss=True
+            "Please select the data.win file from a valid \"Khimera: Destroy All Monster Girls\" build",
+            auto_dismiss=False
         )
 
-        folder_prompt = dialog.run(
-            Utils.open_directory,
-            "Open vanilla build"
+        file_prompt = dialog.run(
+            Utils.open_filename,
+            "Select the build's data.win",
+            [("data.win", ["data.win"])]
         )
         if loading_message is not None:
             loading_message.open(animation=False)
 
-        folder = await folder_prompt
+        file = await file_prompt
 
-        if loading_message is not None:  # Dismissed by being done with the folder selector, if not dismissed already
+        if loading_message is not None:  # Dismissed by being done with the file selector, if not dismissed already
             loading_message.dismiss(force=True, animation=False)
 
-        if folder is None or folder == "":
+        if file is None or file == "":
+            return None
+        file_path = Path(file)
+
+        # Has to be lowercase for hash validation.
+        if file_path.name != "data.win":
+            msg = self._message(
+                "Invalid name",
+                "Please select a valid data.win file."
+            )
+            logger.warning("Invalid name, please select a valid data.win file")
+            if msg is not None:
+                msg.open()
             return None
 
-        return Path(folder)
+        return file_path.parent
 
     async def startup_prompt(self) -> Path | None:
         skip_prompt = KhimeraDAMGStorageHandler.get(key="skip_startup_prompt", file_name="meta", category="launcher")
