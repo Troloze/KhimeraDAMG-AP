@@ -1,0 +1,6 @@
+# Patterns listed here are added to Archipelago's data/GLOBAL.apignore when the "Build APWorlds"
+# component packages this world. Only this file is honoured; .gitignore is not.
+
+# Development-only test package. It imports Archipelago's own test bases, which do not exist in
+# a player's installation, and nothing in the apworld imports it.
+/tests/
