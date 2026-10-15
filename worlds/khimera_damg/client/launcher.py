@@ -61,7 +61,7 @@ class KhimeraDAMGLauncher:
         if self.tracking:
             return None
         try:
-            load_patch(host_version)
+            await asyncio.to_thread(load_patch, host_version)
         except SourceNotFoundError as err:
             path = await self._launch_prompt()
             if path is None:

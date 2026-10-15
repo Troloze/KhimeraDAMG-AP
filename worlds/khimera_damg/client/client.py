@@ -1101,14 +1101,19 @@ class KhimeraDAMGContext(CommonContext):
         path = await self.launcher.startup_prompt()
         if path is None:
             return
-
+        load_successfull = False
         try:
-            try_load_build(path)
+            load_successfull = await asyncio.to_thread(try_load_build, path)
+            if not load_successfull:
+                logger.warning("Couldn't load build, Please try again later.")
         except (OSError, SourceNotFoundError) as err2:
-            msg = self.launcher._message("Couldn't load build", "Please try again later.", error=True)
-            if msg is not None:
-                msg.open()
+            load_successfull = False
             raise err2
+        finally:
+            if not load_successfull:
+                msg = self.launcher._message("Couldn't load build", "Please try again later.", error=True)
+                if msg is not None:
+                    msg.open()
 
     def make_gui(self) -> type[kvui.GameManager]:
         import kvui  # type: ignore
