@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import threading
 import time
+from contextlib import suppress
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -261,6 +262,14 @@ class KhimeraDAMGCommandProcessor(ClientCommandProcessor):
         ):
             logger.warning("Failed to launch game: You can only launch a game when connected to a slot.")
             return
+        if (
+            self.ctx.communication_interface is None or
+            not self.ctx.communication_interface.running or
+            self.ctx.communication_interface.stopped
+        ):
+            logger.warning("Communication systems are currently not running, please reconnect to restart them.")
+            return
+
         if self.ctx.launcher.tracking:
             logger.warning("Failed to launch game: There already is game running.")
             return
@@ -546,6 +555,9 @@ class KhimeraDAMGContext(CommonContext):
     game = GAME_FULL_NAME
     items_handling = 0b111
 
+    class FailedToStartCommunicationError(Exception):
+        pass
+
     def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
         super().__init__(server_address, password)
         self.launcher: KhimeraDAMGLauncher = KhimeraDAMGLauncher(ctx=self)
@@ -677,7 +689,9 @@ class KhimeraDAMGContext(CommonContext):
         if self.li is None:
             logger.exception("Attempt to start the server loop without creating the location information")
             return
-
+        p_e = None
+        p_et = 0.0
+        p_ec = 1.0
         # Only sends things UP to the host
         self.communication_stop_event = asyncio.Event()
         game_status = None
@@ -685,6 +699,8 @@ class KhimeraDAMGContext(CommonContext):
             start = time.perf_counter()
             # ruff: disable[too-many-statements-in-try-clause]
             try:
+                if self.communication_interface is None or not self.communication_interface.running:
+                    continue
                 # Heartbeat probe
                 if game_status is None:
                     game_status = asyncio.create_task(
@@ -704,8 +720,16 @@ class KhimeraDAMGContext(CommonContext):
                 # Dispatches packages to host and game based on connection state
                 await self._process_connection_state()
             except Exception as err:
-                logger.exception(f"An exception was raised in server loop: {err}")
-            await asyncio.sleep(max(0.0, self.communication_cooldown - (time.perf_counter() - start)))
+                if not (
+                    p_e is not None and
+                    p_e[0] is type(err) and p_e[1] == str(err) and
+                    time.perf_counter() - p_et < p_ec
+                ):
+                    logger.exception(f"An exception was raised in server loop: {err}")
+                    p_et = time.perf_counter()
+                p_e = (type(err), str(err))
+            finally:
+                await asyncio.sleep(max(0.0, self.communication_cooldown - (time.perf_counter() - start)))
             # ruff: enable[too-many-statements-in-try-clause]
         self.communication_stop_event = None
 
@@ -780,14 +804,18 @@ class KhimeraDAMGContext(CommonContext):
             await self.communication_interface.stop()
 
         self.communication_interface = KhimeraDAMGCommunicationInterface()
-        await self.communication_interface.start(self.cctx, self.li)
+        try:
+            await self.communication_interface.start(self.cctx, self.li)
+        except OSError as err:
+            # Not caught as the new type, but useful to differentiate between the storage OSErrors when debugging.
+            raise self.FailedToStartCommunicationError(f"Could not start communication: {err}") from err
 
-    async def _delayed_startup(self) -> None:
+    async def _delayed_startup(self) -> bool:
         if self.slot is None or self.host_seed is None:
             # Nothing connected, we need something connected.
-            return
+            return False
         if self.host_world_version is None or self.slot_name is None:
-            return
+            return False
 
         if (
             self.communication_interface is not None and
@@ -797,19 +825,6 @@ class KhimeraDAMGContext(CommonContext):
             # Connection state is reset by launcher, so no need to do it here.
             await self.communication_interface.stop()
             self.communication_interface = None
-
-        # Launch game first!
-        if not self.launcher.tracking:
-            try:
-                await self.launcher.launch_game(
-                    self.host_world_version,
-                    self.current_address,  # type: ignore
-                    self.slot_name,
-                    self.game_id  # type: ignore
-                )
-            except Exception:
-                logger.exception("Khimera launch failed; server connection remains active.")
-                return
 
         # Wait for win status
         try:
@@ -821,14 +836,39 @@ class KhimeraDAMGContext(CommonContext):
         if self.communication_interface is None:
             try:
                 await self._start_up_game_processes()
-            except Exception:
-                logger.exception("Khimera setup failed; server connection remains active.")
+            except Exception as err:
+                self.communication_interface = None
+                logger.exception(
+                    f"Khimera setup failed: {err}.\nServer connection remains active, "
+                    "reconnect if you intend to launch the game."
+                )
+                return False
 
+        if self.communication_task is not None and self.communication_task.done():
+            with suppress(Exception):
+                # At this point, it doesn't matter
+                await self.communication_task
+            self.communication_task = None
         if self.communication_task is None:
             self.communication_task = asyncio.create_task(
                 self._communication_loop(),
                 name="kdamg_client_communication_loop"
             )
+
+        # Launch game after the communication interface successfully builds!
+        if not self.launcher.tracking:
+            try:
+                await self.launcher.launch_game(
+                    self.host_world_version,
+                    self.current_address,  # type: ignore
+                    self.slot_name,
+                    self.game_id  # type: ignore
+                )
+            except Exception:
+                logger.exception("Khimera launch failed; server connection remains active.")
+                return False
+
+        return True
 
     async def _validate_connection(self) -> bool:
         if self.slot is None or self.host_seed is None or self.current_address is None:
@@ -987,12 +1027,8 @@ class KhimeraDAMGContext(CommonContext):
         self.connection_state.set_item_ack(last_ack)
 
     async def connection_closed(self) -> None:
-        try:
+        with suppress(OSError):
             self.cctx = self._make_cctx()
-        except OSError:
-            # Seems like we will have to stay with an outdated cctx.
-            # Should be fine though.
-            pass
 
         self.game_id = None
         self.is_game_connected = False

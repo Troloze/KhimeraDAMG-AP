@@ -108,7 +108,15 @@ class KhimeraDAMGCommunicationInterface:
         self.host_world_version = connection_context.host_world_version
         self.slot_name = connection_context.slot_name
         self.seed = connection_context.seed
-        self.agent = get_agent(self.host_world_version)()
+
+        # Raises OSError when it can't access the sandbox folder.
+        try:
+            self.agent = get_agent(self.host_world_version)()
+        except OSError as err:
+            self.stopped = True
+            self.stop_flag.set()
+            raise err
+
         self.running = True
         self.starter_task = asyncio.create_task(
             self.agent.open_communication(
@@ -121,14 +129,10 @@ class KhimeraDAMGCommunicationInterface:
         )
         try:
             await self.starter_task
-        except (OSError, TypeError, ValueError) as err:
-            logger.exception(err)
         finally:
             if not self.agent.inspect_communication():
                 # This interface is permanently stopped, create a new one to try again.
-                self.running = False
-                self.agent.close_communication()
-                self.stop_flag.set()
+                await self.stop()
 
     def authenticate(self, slot_name: str, seed: str) -> bool:
         """Returns false when the credentials do not match."""
