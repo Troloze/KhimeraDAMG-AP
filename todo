@@ -9,3 +9,9 @@ If that's exhausted as well, it's probably time to make a release.
 **Todo before sending a PR**
 
 **Todo right after sending the PR** 
+
+**Todo before the release**
+- Send the json through message, only parse it in ContractV1
+- Gourmet Gal and Detonators are always shuffled.
+- Costume Randomizer (always shuffled).
+    - Berserk Mode shuffling is optional.
