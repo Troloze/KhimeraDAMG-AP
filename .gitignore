@@ -1,12 +1,8 @@
-/_ignore_/
 /.py-env/
 /Archipelago/
 /KhimeraDAMG-AP-Mod/
-/testing/
 __pycache__/
 
-/build/
 /khimera_damg/patches/*.zip
 /khimera_damg/patches/data.py
 /docs/report/
-/fuzz-env/
