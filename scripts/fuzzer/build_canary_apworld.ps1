@@ -11,9 +11,9 @@
     old all-hooks-at-once invocation did for months without anyone noticing.
 
     The world is written from scratch here and packed into
-    fuzz-env\ap-fuzz\custom_worlds\kdamg_canary.apworld. It exists only in the fuzzer worktree,
-    only for the length of a canary pass: scripts/run_fuzzer.ps1 builds it before the pass and
-    removes it afterwards, so it is never loaded alongside a real measurement.
+    Archipelago\custom_worlds\kdamg_canary.apworld. It exists only for the length of a canary
+    pass: scripts/run_fuzzer.ps1 builds it before the pass and removes it afterwards, so it is
+    never loaded alongside a real measurement.
 
 .PARAMETER Remove
     Delete the canary .apworld instead of building it.
@@ -24,10 +24,11 @@ param(
 )
 
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$FuzzRoot = Join-Path $Root "fuzz-env\ap-fuzz"
-$FilesPy = Join-Path $FuzzRoot "worlds\Files.py"
-$Stage = Join-Path $Root "fuzz-env\canary-build"
-$OutputFile = Join-Path $FuzzRoot "custom_worlds\kdamg_canary.apworld"
+$ApRoot = Join-Path $Root "Archipelago"
+$FilesPy = Join-Path $ApRoot "worlds\Files.py"
+$Stage = Join-Path $Root "fuzzer\canary-build"
+$OutputFile = Join-Path $ApRoot "custom_worlds\kdamg_canary.apworld"
+$VenvPython = Join-Path $Root ".py-env\venv\Scripts\python.exe"
 $ModuleName = "kdamg_canary"
 $GameName = "KDAMG Fuzzer Canary"
 
@@ -39,11 +40,13 @@ if ($Remove) {
 }
 
 if (-not (Test-Path $FilesPy)) {
-    throw "Fuzzer worktree not found at $FuzzRoot. Run scripts\run_fuzzer.ps1 -Setup first."
+    throw "Archipelago is not set up at $ApRoot. Run scripts\setup.ps1 first."
 }
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
+$null = Assert-BuildState -Allowed @("development", "prepared") -Action "Building the canary world"
 
 # Same reason as in build_empty_apworld.ps1: APWorldContainer.read() needs version and
-# compatible_version in the manifest, and the value has to match the worktree that loads it.
+# compatible_version in the manifest, and the value has to match the Archipelago that loads it.
 $Match = Select-String -Path $FilesPy -Pattern 'container_version:\s*int\s*=\s*(\d+)' | Select-Object -First 1
 if (-not $Match) {
     throw "Could not find container_version in $FilesPy."
@@ -53,7 +56,7 @@ $ContainerVersion = [int] $Match.Matches[0].Groups[1].Value
 $Source = @'
 """A world that is broken on purpose, for checking that the fuzzer pipeline reports failures.
 
-Built by scripts/fuzzer/build_canary_apworld.ps1 into the fuzzer worktree only. Never install it.
+Built by scripts/fuzzer/build_canary_apworld.ps1 for a single canary pass. Never install it.
 """
 
 from BaseClasses import Item, ItemClassification, Location, Region
@@ -119,11 +122,10 @@ if (-not (Test-Path $OutputDir)) {
 Move-Item $Zip $OutputFile -Force
 Remove-Item $Stage -Recurse -Force
 
-$VenvPython = Join-Path $FuzzRoot ".venv\Scripts\python.exe"
 if (Test-Path $VenvPython) {
     $Probe = "from worlds.Files import APWorldContainer; " +
              "c = APWorldContainer(r'$OutputFile'); c.read(); print(c.game)"
-    Push-Location $FuzzRoot
+    Push-Location $ApRoot
     try {
         $Output = & $VenvPython -c $Probe
     }

@@ -29,18 +29,20 @@ developer what state it is in before a milestone release.
   <project>
   KhimeraDAMG-AP is an Archipelago randomizer for "Khimera: Destroy All Monster Girls". It has
   three parts:
-  - The apworld, under `worlds/khimera_damg/`: generation (items, locations, regions, rules,
-    options), a client that talks to the game through files described in a versioned
-    communication contract, a launcher, and a patcher that applies small binary diff patches to
-    the game. Its `tests/` package is a development-only unittest suite, kept out of the built
-    `.apworld` by `.apignore`.
-  - The game-side mod, in the `KhimeraDAMG-AP-Mod/` submodule.
+  - The apworld, under `khimera_damg/`: generation (items, locations, regions, rules, options),
+    a client that talks to the game through files described in a versioned communication
+    contract, a launcher, and a patcher that applies small binary diff patches to the game. Its
+    `tests/` package is a development-only unittest suite, kept out of the built `.apworld` by
+    `.apignore`.
+  - The game-side mod, developed in its own repository. `scripts/setup.ps1` clones it into the
+    gitignored `KhimeraDAMG-AP-Mod/` folder, where the build takes its release zips from.
   - Repository tooling: PowerShell scripts in `scripts/` for setup, build, lint, tests and
     fuzzing, plus design notes in `docs/`.
 
-  `Archipelago/` is a submodule fork of Archipelago and serves as reference and build host.
-  Testing targets the *installed* Archipelago build, whose core version may differ from the
-  submodule.
+  `Archipelago/` is a gitignored, disposable clone of upstream Archipelago at a pinned tag, made
+  by `scripts/setup.ps1`. It serves as reference and as the host the apworld is built, tested and
+  fuzzed in, reaching the apworld through a junction at `Archipelago/worlds/khimera_damg`. Testing
+  targets the *installed* Archipelago build, whose core version may differ from the clone.
 
   The developer intends to submit this apworld to the ionium index. The index rules are therefore
   this project's own release requirements: audit them as a standing checklist and report every
@@ -62,22 +64,31 @@ developer what state it is in before a milestone release.
   By invoking this skill, the developer grants explicit permission for the following actions only,
   for the duration of this review:
   - Creating exactly one file: the report described in <output>.
-  - Running `scripts/build_apworld.ps1`. It writes gitignored build outputs in this repository,
-    and runs Archipelago's `Launcher.py` from the submodule, which leaves logs, `host.yaml` and
-    `__pycache__/` inside `Archipelago/`.
-  - Running `scripts/run_fuzzer.ps1` with any `-Pass`, including `-Setup` if the fuzzer is not
-    set up yet. It writes into the gitignored `fuzz-env/`, `fuzzer/` and `build/` folders, plus
-    whatever the build step above leaves in `Archipelago/`. Before each run it may move the fuzzer
-    worktree `fuzz-env/ap-fuzz` to the commit the `Archipelago` submodule is at (a checkout inside
-    that worktree, never in `Archipelago/`) and reinstall the worktree's requirements into its
-    venv; `-Setup` also clones the fuzzer and `empty-apworld` from GitHub. All of that is part of
-    the permitted command. Record a worktree move under "Not verified" as a side effect.
   - Running `scripts/run_tests.ps1`, with any of its switches. It runs the apworld's own tests in
-    `worlds/khimera_damg/tests/` and, with `-Core` or `-All`, Archipelago's core suite scoped to
-    this world, from a temporary folder, and writes nothing into the repository.
-  - Running Archipelago's core unit tests from the fuzzer worktree `fuzz-env/ap-fuzz`, with the
-    freshly built `.apworld` in its `custom_worlds/`, exactly as the index section of `CLAUDE.md`
-    gives the command (including `-t .`). Never run them from `Archipelago/` itself.
+    `khimera_damg/tests/` and, with `-Core` or `-All`, Archipelago's core suite scoped to this
+    world, from a temporary folder, and writes nothing into the repository. Development state only.
+  - Running `scripts/build_apworld.ps1`. It writes the gitignored `khimera_damg/patches/data.py`
+    and release zips, and runs Archipelago's `Launcher.py` from the `Archipelago/` root, which
+    writes the built `.apworld` to `Archipelago/build/apworlds/` and leaves logs, `host.yaml` and
+    `__pycache__/` inside `Archipelago/`. Development state only.
+  - Running `scripts/fuzzer_prepare.ps1`. It runs the build above, copies `fuzz.py` and `hooks/`
+    into `Archipelago/`, builds `Archipelago/custom_worlds/empty.apworld` if it is missing, removes
+    the junction at `Archipelago/worlds/khimera_damg`, installs the built `.apworld` in
+    `Archipelago/custom_worlds/` and writes `Archipelago/kdamg_prepared.json`.
+  - Running `scripts/fuzzer_cleanup.ps1`. It removes the installed `.apworld` and the state file,
+    and recreates the junction.
+  - Running `scripts/run_fuzzer.ps1` with any `-Pass`, and with `-Setup` if the fuzzer is not set
+    up yet. It writes the run archives into the gitignored `fuzzer/runs/`, and `fuzz_output/` and a
+    short-lived canary world into `Archipelago/`. `-Setup` also clones the fuzzer and
+    `empty-apworld` from GitHub into `fuzzer/` and rebuilds `empty.apworld`. Passes need the
+    prepared state.
+  - Running `scripts/run_index_tests.ps1`, with `-Detailed` or `-Filter`. It runs Archipelago's
+    full core suite from the `Archipelago/` root against the installed build, leaving logs and
+    `host.yaml` there. Prepared state only.
+  - Running `scripts/restore_archipelago.ps1` without `-Reclone`, only when a script has reported
+    that `Archipelago/` is in an ambiguous state. It resets the clone to its pinned commit locally,
+    without a download, and ends in the development state.
+  - Dot-sourcing `scripts/build/build_state.ps1` to call `Get-BuildState`, which only reads.
   - Running `scripts/run_ruff.ps1` or `ruff check --config ruff.toml`, never with `--fix` or
     `-Fix`.
   - Reading `C:\ProgramData\Archipelago\` (the installed build, including `manifest.json` and
@@ -89,18 +100,41 @@ developer what state it is in before a milestone release.
   - Read-only git commands.
 
   Everything else still falls under `CLAUDE.md` rule 1 and is not permitted. That includes
-  `scripts/build_and_replace.ps1`, writing into either submodule yourself, changing git state,
-  editing any existing file, and running generation through the installed build. If a check needs
-  something outside this list, skip it and record it under "Not verified" in the report.
+  `scripts/build_and_replace.ps1`, the setup scripts, `scripts/restore_mod.ps1`,
+  `scripts/restore_archipelago.ps1` outside the case above, running `fuzz.py` or the core suite
+  directly instead of through the scripts, writing into `Archipelago/` or `KhimeraDAMG-AP-Mod/`
+  yourself, changing git state, editing any existing file, and running generation through the
+  installed build. If a check needs something outside this list, skip it and record it under
+  "Not verified" in the report.
 
-  Files that the Archipelago runtime writes into a submodule while one of the commands above
-  runs fall under the exception in `CLAUDE.md` ("Build and test environment"): they are allowed
-  as long as every change they leave is ignored by the submodule's own `.gitignore`. They are not
-  a violation, not a finding, and not a reason to skip a permitted step. List them as side effects
-  under "Not verified". After the build, the fuzzer and the tests, run `git -C Archipelago status`
-  and `git -C KhimeraDAMG-AP-Mod status`. If either shows a change, it is not covered: leave it
-  as it is, record it in the report, and tell the developer in the chat reply (task 44).
+  `Archipelago/` and `KhimeraDAMG-AP-Mod/` are disposable clones (`CLAUDE.md`, "The two
+  downloaded folders"), so what the commands above leave in them is expected: not a violation, not
+  a finding, and not a reason to skip a permitted step. List it as a side effect under "Not
+  verified". After the build, the fuzzer and the tests, run `git -C Archipelago status` and
+  `git -C KhimeraDAMG-AP-Mod status`. None of the commands should change a *tracked* file in
+  either clone. If one did, leave it as it is, record it in the report, and tell the developer in
+  the chat reply (task 44).
   </permissions>
+
+  <build_states>
+  The scripts track the state `Archipelago/` is in (`scripts/build/build_state.ps1`), and each
+  refuses to run in the wrong one:
+  - Development: the junction at `Archipelago/worlds/khimera_damg` points at `khimera_damg/`, and
+    no built `.apworld` is installed. `run_tests.ps1` and `build_apworld.ps1` need it. This is the
+    state the review starts and must end in.
+  - Prepared: entered by `fuzzer_prepare.ps1`. The junction is removed and the built `.apworld` is
+    installed, because Archipelago loads a world folder in preference to an `.apworld` of the same
+    game and would otherwise test the source. `run_fuzzer.ps1` passes and `run_index_tests.ps1`
+    need it, and both refuse a build that no longer matches `khimera_damg/`. `fuzzer_cleanup.ps1`
+    returns to development.
+  - Ambiguous: anything else, such as a run that was killed half-way. Every script refuses it and
+    names `restore_archipelago.ps1`, which the permissions above allow for exactly this case.
+
+  A refusal is a script doing its job, not a defect. Follow its instruction, and do not work
+  around it by hand. Run `Get-BuildState` before the first command of Phase 3 and after the last.
+  If the review does not start in the development state, record that, and use `fuzzer_cleanup.ps1`
+  (from prepared) or `restore_archipelago.ps1` (from ambiguous) to get there.
+  </build_states>
 
   <guard_hook>
   While this skill is active, a PreToolUse hook (`review_guard.ps1`, next to this file) inspects
@@ -115,15 +149,16 @@ developer what state it is in before a milestone release.
 
 <scope>
   <in_scope>
-  - `worlds/` (everything under `worlds/khimera_damg/`)
+  - `khimera_damg/` (everything under it)
   - `scripts/`
   - `docs/` (excluding `docs/report/`, which holds previous reports and is used for the delta
     only)
-  - Every file at the repository root, including dotfiles (`.gitignore`, `.gitmodules`,
-    `.apignore` if present, `ruff.toml`, `CLAUDE.md`, `todo`, and the rest)
+  - Every file at the repository root, including dotfiles (`.gitignore`, `.apignore` if present,
+    `ruff.toml`, `CLAUDE.md`, `todo`, and the rest)
   - `.claude/` (this skill and anything else there)
-  - `fuzz-meta/`
-  - The built `.apworld` artifact, inspected as a zip
+  - `fuzzer/khimera_damg.yaml`
+  - The built `.apworld` artifact (`Archipelago/build/apworlds/khimera_damg.apworld`), inspected
+    as a zip
   </in_scope>
   <reference_only>
   `Archipelago/` and `KhimeraDAMG-AP-Mod/`. Read them to verify how the apworld uses Archipelago
@@ -132,9 +167,8 @@ developer what state it is in before a milestone release.
   version-dependent.
   </reference_only>
   <out_of_scope>
-  Gitignored working folders (`python/`, `py-env/`, `build/` except the built apworld,
-  `fuzz-env/` except the fuzzer's archived results in `fuzz-env/ap-fuzz/fuzz_runs/`, `fuzzer/`,
-  `testing/`).
+  Gitignored working folders (`.py-env/`, `fuzzer/` except `khimera_damg.yaml` and the archived
+  results in `fuzzer/runs/`, `testing/`).
   </out_of_scope>
   Read every in-scope source file in full. Do not sample or skim.
 </scope>
@@ -144,7 +178,7 @@ developer what state it is in before a milestone release.
   How the apworld uses Archipelago systems and packages: the World API and its lifecycle methods,
   options, regions, entrances, rules, items, locations, slot data, the web world,
   CommonClient/launcher components, settings, `Utils` helpers. Look for private, deprecated or
-  version-dependent APIs. Compare the installed core version against the submodule and
+  version-dependent APIs. Compare the installed core version against the `Archipelago/` clone and
   `minimum_ap_version`.
   </area>
   <area id="A2" name="Generation logic">
@@ -182,10 +216,8 @@ developer what state it is in before a milestone release.
   </area>
   <area id="A7" name="Repository hygiene">
   Hardcoded absolute paths or usernames anywhere in scope, files that should be gitignored but are
-  not, tracked generated files, stray files, and `.apignore` correctness. Files the Archipelago
-  runtime leaves in a submodule under the `CLAUDE.md` exception are not stray files. That
-  includes `.ruff_cache/` only when Archipelago itself ran ruff; a `.ruff_cache/` from any other
-  run is outside the exception and is reported.
+  not, tracked generated files, stray files, and `.apignore` correctness. Untracked files inside
+  `Archipelago/` and `KhimeraDAMG-AP-Mod/` are not stray files: both are disposable clones.
   </area>
   <area id="A8" name="Documentation correctness">
   Everything in `docs/`, `CLAUDE.md`, docstrings and comments must match the current code. Stale
@@ -203,13 +235,13 @@ developer what state it is in before a milestone release.
   Compare `APWORLD_VERSION` in `__init__.py`, `world_version` in `archipelago.json`,
   `apworld_to_mod_map` and `min_apworld` in `client/patcher.py` (the current `APWORLD_VERSION`
   must not be above the map's largest key or below the floor), the mod versions listed in
-  `patches/include.txt`, the release zips available in the mod submodule, and the version
+  `patches/include.txt`, the release zips available in the `KhimeraDAMG-AP-Mod/` clone, and the version
   metadata inside the built artifact. `CLAUDE.md` ("Four places carry a version") is the
   reference for which of these a version bump has to touch.
   </area>
   <area id="A11" name="Test coverage">
   Which behaviours have tests and which do not, measured against the apworld's own suite in
-  `worlds/khimera_damg/tests/` (described in `CLAUDE.md`, "The apworld's test suite") and the
+  `khimera_damg/tests/` (described in `CLAUDE.md`, "The apworld's test suite") and the
   fuzzer passes. Report gaps as a list, ranked by risk. Do not file them as defects. A test that
   fails, or a test that cannot fail (an assertion that always holds, a skip that always fires),
   is a defect and belongs in the relevant area instead. The tests are AI-written by design and
@@ -280,7 +312,9 @@ Phase 0: Preflight
 3. Determine the apworld version (`world_version` in `archipelago.json`) and today's date, for the
    report filename. Note immediately if `APWORLD_VERSION` disagrees.
 4. Read `C:\ProgramData\Archipelago\manifest.json` and record the installed core version. Then
-   record the submodule's core version.
+   record the `Archipelago/` clone's core version, and the tag and pinned commit it was set up at
+   (`git -C Archipelago describe --tags` and `refs/kdamg/pinned`). Record the commit the
+   `KhimeraDAMG-AP-Mod/` clone is pinned at as well.
 5. Check whether a previous report exists in `docs/report/` and read the latest one.
 6. Read `docs/Known Issues.md` and `docs/Future Reference.md`, and the root `todo`.
 
@@ -310,39 +344,54 @@ Phase 2: Exploration and mapping
     subagents.
 
 Phase 3: Baseline checks (start the fuzzer early, then continue)
-19. Run `scripts/build_apworld.ps1`. Record success or failure and any warnings.
-20. Run the fuzzer through `scripts/run_fuzzer.ps1`, following `docs/Running the Fuzzer.md` (run
-    `-Setup` first if needed). The script runs one pass per check, so that no hook masks
-    another, and archives each pass under `fuzz-env/ap-fuzz/fuzz_runs/<timestamp>/`.
-    - First run `-Pass canary`, in the foreground. It fuzzes a world that is broken on purpose and
-      must come back `ok` (meaning the expected failures were reported). If it does not, the
-      pipeline is hiding failures: file that as a finding, and treat every other fuzzer result in
-      this review as Unknown.
-    - Then start `-Pass all,determinism` in the background (the default `-Runs 500`). `all` is the
-      `rate` pass followed by one pass per counted hook. Only the `rate` pass gives the failure
-      rate; the check passes report findings, not a rate.
-    - The script passes `fuzz-meta/khimera_damg.yaml` by absolute path by default. If that file
-      is missing or not a YAML mapping, the run stops with a message; record it under "Not
-      verified" and rerun with `-NoMeta`.
+The order follows the build states in <build_states>: the development-state checks come first,
+because preparing for the fuzzer removes the junction they need.
+19. Confirm with `Get-BuildState` that `Archipelago/` is in the development state, getting it
+    there first if not (see <build_states>). Run `scripts/run_tests.ps1 -All`: the apworld's own
+    suite, then Archipelago's core suite scoped to this world, against the source through the
+    junction. Record the counts, every failure, and every skipped test with its reason.
+20. Prepare and fuzz, following `docs/Running the Fuzzer.md`, in this order:
+    - If the fuzzer is not set up (`fuzzer/fuzz.py` is missing), run `scripts/run_fuzzer.ps1
+      -Setup`.
+    - Run `scripts/fuzzer_prepare.ps1`. This is the review's build: it runs
+      `scripts/build_apworld.ps1`, so record its success or failure and any warnings from its
+      output. If it fails, file the blocker as [Critical], skip the rest of this task and the full
+      run in task 22, and continue with the remaining tasks.
+    - Run `scripts/run_fuzzer.ps1 -Pass canary` in the foreground. It fuzzes a world that is
+      broken on purpose and must come back `ok` (meaning the expected failures were reported). If
+      it does not, the pipeline is hiding failures: file that as a finding, and treat every other
+      fuzzer result in this review as Unknown.
+    - Run `scripts/run_index_tests.ps1` in the foreground (about 90 seconds): Archipelago's full
+      core suite, every world, against the installed build, the way the index runs it. Task 22
+      judges the result. It runs before the long fuzzer run so the two never share `Archipelago/`.
+    - Then start `scripts/run_fuzzer.ps1 -Pass all,determinism` in the background (the default
+      `-Runs 500`). `all` is the `rate` pass followed by one pass per counted hook. Only the
+      `rate` pass gives the failure rate; the check passes report findings, not a rate. Each pass
+      is archived under `fuzzer/runs/<timestamp>/`. Until task 36 cleans up, run nothing else that
+      writes into `Archipelago/`.
+    - The fuzzer passes `fuzzer/khimera_damg.yaml` by absolute path by default. If that file is
+      missing or not a YAML mapping, the run stops with a message; record it under "Not verified"
+      and rerun with `-NoMeta`.
     - If the live rules from Phase 1 measure something the passes do not (a different
       `--yamls_per_run`, another hook, a different way of adding Empty), record the exact
       difference under "Not verified" and as an A8 finding.
 21. Run ruff with `ruff.toml` (`scripts/run_ruff.ps1` covers the apworld, its tests included).
     Record the results.
-22. Run `scripts/run_tests.ps1 -All`: the apworld's own suite, then Archipelago's core suite scoped
-    to this world. Record the counts, every failure, and every skipped test with its reason. Then
-    run the full core suite as the index does, from `fuzz-env/ap-fuzz` with its venv, after task
-    20 has installed the fresh `.apworld` into `custom_worlds/`, using the command given in the
-    index section of `CLAUDE.md` (with `-B` and `-t .`). Every failure that involves this world
-    counts against the index's "must pass all core unit tests" requirement; failures in other
-    worlds are recorded under "Not verified" as environment problems.
-23. Open the built `.apworld` as a zip, read-only, without extracting it to disk. List its
-    contents, read its packaged `archipelago.json`, confirm `patches/data.py` and the patch zips
-    are present, and check for anything that should not ship.
+22. Judge the index's "must pass all core unit tests" requirement on the full run from task 20,
+    which is what the index runs; the scoped `-Core` run from task 19 is supporting evidence only.
+    Record the counts and every failure. A failure that involves this world counts against the
+    requirement; failures confined to other worlds are recorded under "Not verified" as
+    environment problems. If the full run could not happen, the requirement is Unknown, not Pass.
+23. Open the built `.apworld` (`Archipelago/build/apworlds/khimera_damg.apworld`) as a zip,
+    read-only, without extracting it to disk. Confirm its SHA-256 matches `apworld_sha256` in
+    `Archipelago/kdamg_prepared.json` (or in the fuzzer's `run.json` once cleaned up), so the
+    artifact inspected is the one fuzzed and tested. List its contents, read its packaged
+    `archipelago.json`, confirm `patches/data.py` and the patch zips are present, and check for
+    anything that should not ship.
 
 Phase 4: Area review (parallel subagents, lead verifies)
 24. Review A1 (Archipelago compatibility), checking against both the installed core version and
-    the submodule.
+    the `Archipelago/` clone.
 25. Review A2 (generation logic), including every option and the edges of its range.
 26. Review A3 (code safety) across the client, launcher, patcher and storage.
 27. Review A4 (security) for every input that crosses a trust boundary.
@@ -362,7 +411,10 @@ Phase 5: User journeys
     message. Feed what you find into the relevant area's findings.
 
 Phase 6: Index readiness
-36. Collect the fuzzer results from the run folders of task 20: each pass's `result.json` (counts,
+36. Once the background run of task 20 has finished, run `scripts/fuzzer_cleanup.ps1` and confirm
+    with `Get-BuildState` that `Archipelago/` is back in the development state, then run the
+    `git status` checks from <permissions>. Do this even when a pass failed or the run was cut
+    short. Then collect the fuzzer results from the run folders of task 20: each pass's `result.json` (counts,
     rate, verdict, notes, top errors) and its `error/` folder. Check the `rate` pass's rate
     against the live rules' definition rather than taking the script's verdict on trust, and list
     failures by pass and by exception type, with a representative traceback for each. A pass
@@ -379,15 +431,15 @@ Phase 7: Consolidation
     Still open or Changed, and tag new ones as New. Skip [Cosmetic] findings entirely here, old
     and new: they describe only the current state of the repository.
 41. List everything that was not reviewed or not verified, and why, including anything the guard
-    hook blocked and every file the runtime wrote into a submodule.
+    hook blocked and what the permitted commands left in `Archipelago/` and `KhimeraDAMG-AP-Mod/`.
 42. Count the findings per area and severity for the area metrics table in <output>. A finding
     filed under several areas counts once in each of them.
 
 Phase 8: Report
 43. Write the report file as specified in <output>. This is the only file you create.
 44. In chat, reply with only the report path, the counts per severity, the index verdict, the
-    three most important findings, and any change that `git status` showed in either submodule
-    (see <permissions>).
+    three most important findings, and any change to a tracked file that `git status` showed in
+    `Archipelago/` or `KhimeraDAMG-AP-Mod/` (see <permissions>).
 </tasks>
 
 <output>
@@ -401,9 +453,10 @@ comment:
 
 Use this structure:
 
-1. **Header**: apworld version (both version values), installed core version, submodule core
-   version, branch, commit, whether the working tree was dirty, the date, and when the live index
-   rules were fetched (or that they could not be).
+1. **Header**: apworld version (both version values), installed core version, the `Archipelago/`
+   clone's core version with its tag and pinned commit, the `KhimeraDAMG-AP-Mod/` pinned commit,
+   branch, commit, whether the working tree was dirty, the date, and when the live index rules
+   were fetched (or that they could not be).
 2. **Executive summary**: overall release readiness in a few sentences, counts per severity, and
    the index verdict.
 3. **Index readiness**: a table with one row per live requirement, each marked Pass, Fail or
@@ -451,4 +504,6 @@ Use this structure:
   ID-stability and compatibility findings. Check whether it is still present before applying it.
 - If something essential is impossible (for example, the build fails), continue with every
   remaining task you can. Report the blocker as [Critical].
+- Never finish the review with `Archipelago/` prepared or ambiguous. If task 36 could not return it
+  to the development state, say so in the report and in the chat reply.
 </constraints>

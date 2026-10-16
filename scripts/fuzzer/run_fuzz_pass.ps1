@@ -12,9 +12,9 @@
 
     The pass table below says, for each pass, which hooks it loads, whether it may skip output,
     and whether the Empty world is added to every generation. The script checks the fuzzer
-    environment for what that pass needs before starting, runs fuzz.py from the fuzzer worktree,
-    moves fuzz_output into the archive folder (fuzz.py wipes it at the start of every run), and
-    writes result.json there with the counts, the verdict, and the most common errors.
+    environment for what that pass needs before starting, runs fuzz.py from the Archipelago
+    folder, moves fuzz_output into the archive folder (fuzz.py wipes it at the start of every
+    run), and writes result.json there with the counts, the verdict, and the most common errors.
 
     Exit codes: 0 when the verdict is "ok", 1 when it is "fail", 2 when the pass could not run
     or did not finish ("error" or "stalled").
@@ -53,8 +53,11 @@ param(
 )
 
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$FuzzRoot = Join-Path $Root "fuzz-env\ap-fuzz"
-$VenvPython = Join-Path $FuzzRoot ".venv\Scripts\python.exe"
+# fuzz.py puts its own folder on sys.path to import Archipelago, so it runs from the Archipelago
+# root, where scripts/fuzzer_prepare.ps1 copies it and the hooks.
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
+$FuzzRoot = Join-Path $Root "Archipelago"
+$VenvPython = Join-Path $Root ".py-env\venv\Scripts\python.exe"
 $FuzzOutput = Join-Path $FuzzRoot "fuzz_output"
 
 # The index's acceptance bar: the failure rate must be below this.
@@ -162,10 +165,15 @@ if (-not $PassTable.Contains($Pass)) {
 $Definition = $PassTable[$Pass]
 
 if (-not (Test-Path $VenvPython)) {
-    Stop-Pass "Fuzzer environment not found at $FuzzRoot. Run scripts/run_fuzzer.ps1 -Setup first."
+    Stop-Pass "The build venv was not found at $VenvPython. Run scripts/setup.ps1 first."
 }
-if (-not (Test-Path (Join-Path $FuzzRoot "fuzz.py"))) {
-    Stop-Pass "fuzz.py is missing from $FuzzRoot. Run scripts/run_fuzzer.ps1 -Setup first."
+# The prepared state, with a build that still matches khimera_damg\. It also guarantees that the
+# world link is gone, without which the source would be fuzzed in place of the installed build.
+try {
+    $null = Assert-PreparedBuildCurrent -Action "The $Pass pass"
+}
+catch {
+    Stop-Pass $_.Exception.Message
 }
 
 $Hooks = @()
@@ -173,7 +181,7 @@ if ($Definition.Empty) {
     $Hooks += "hooks.with_empty:Hook"
     if (-not (Test-Path (Join-Path $FuzzRoot "custom_worlds\empty.apworld"))) {
         Stop-Pass ("custom_worlds\empty.apworld is missing, so the Empty world cannot be added. " +
-                   "Run scripts/fuzzer/build_empty_apworld.ps1 or scripts/run_fuzzer.ps1 -Setup.")
+                   "Run scripts/fuzzer/build_empty_apworld.ps1, or scripts/fuzzer_prepare.ps1 again.")
     }
 }
 $Hooks += $Definition.Hooks
@@ -182,7 +190,7 @@ foreach ($hook in $Hooks) {
     $module = ($hook -split ":")[0]
     $file = Join-Path $FuzzRoot (($module -replace "\.", "\") + ".py")
     if (-not (Test-Path $file)) {
-        Stop-Pass "Hook $hook is not in the fuzzer worktree ($file). Run scripts/run_fuzzer.ps1 -Setup."
+        Stop-Pass "Hook $hook is not in $FuzzRoot ($file). Run scripts/run_fuzzer.ps1 -Setup, then scripts/fuzzer_prepare.ps1."
     }
 }
 
@@ -194,7 +202,7 @@ if ($Definition.NeedsKingdomHearts) {
           (Test-Path (Join-Path $FuzzRoot "worlds\kh1.apworld")) -or
           (Test-Path (Join-Path $FuzzRoot "custom_worlds\kh1.apworld"))
     if (-not $kh) {
-        Stop-Pass "gerpocalypse needs the Kingdom Hearts world (worlds\kh1), and the fuzzer worktree has none."
+        Stop-Pass "gerpocalypse needs the Kingdom Hearts world (worlds\kh1), and $FuzzRoot has none."
     }
 }
 
@@ -243,7 +251,7 @@ foreach ($hook in $Hooks) {
 }
 $FuzzArgs += $ExtraArgs
 
-$Command = ".venv\Scripts\python.exe " + (($FuzzArgs | ForEach-Object {
+$Command = "$VenvPython " + (($FuzzArgs | ForEach-Object {
     if ($_ -match "\s") { "`"$_`"" } else { $_ }
 }) -join " ")
 
