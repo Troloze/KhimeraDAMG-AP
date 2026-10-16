@@ -1,8 +1,8 @@
 /.py-env/
+/.vscode/
 /Archipelago/
 /KhimeraDAMG-AP-Mod/
 __pycache__/
-
 /khimera_damg/patches/*.zip
 /khimera_damg/patches/data.py
 /docs/report/
