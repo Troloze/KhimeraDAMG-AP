@@ -42,6 +42,8 @@ if ($Remove) {
 if (-not (Test-Path $FilesPy)) {
     throw "Archipelago is not set up at $ApRoot. Run scripts\setup.ps1 first."
 }
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
+$null = Assert-BuildState -Allowed @("development", "prepared") -Action "Building the canary world"
 
 # Same reason as in build_empty_apworld.ps1: APWorldContainer.read() needs version and
 # compatible_version in the manifest, and the value has to match the Archipelago that loads it.

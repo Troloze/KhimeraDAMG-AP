@@ -20,6 +20,9 @@ $RepoUrl     = "https://github.com/ionium-ap/empty-apworld"
 if (-not (Test-Path $FilesPy)) {
     throw "Archipelago is not set up at $ApRoot. Run scripts\setup.ps1 first."
 }
+# empty.apworld belongs to both states (scripts\build\build_state.ps1); only an unclear one stops it.
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
+$null = Assert-BuildState -Allowed @("development", "prepared") -Action "Building empty.apworld"
 
 # The clone lives under fuzzer\, whose generated .gitignore ignores everything but the fuzz-meta
 # file, so it can keep its own .git and be pulled or re-pinned by hand.

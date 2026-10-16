@@ -6,8 +6,12 @@
 
 .DESCRIPTION
     Every tracked file is reset to that commit and everything else is deleted, ignored files
-    included (logs, host.yaml, __pycache__). The world link is removed first so nothing reaches
-    khimera_damg\ in this repository through it, and created again at the end.
+    included (logs, host.yaml, __pycache__, the build, and everything fuzzer_prepare.ps1
+    installed). The world link is removed first so nothing reaches khimera_damg\ in this
+    repository through it, and created again at the end.
+
+    The result is always the development state (scripts\build\build_state.ps1), which makes this
+    the way out of an ambiguous state that the other scripts refuse to work in.
 
     When the clone cannot be restored in place, the folder is deleted and the same commit is
     downloaded again. When there is no usable clone at all, this falls back to

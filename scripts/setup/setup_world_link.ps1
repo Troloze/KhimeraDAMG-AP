@@ -21,6 +21,15 @@ if (-not (Test-Path $ApWorldsDir)) {
     exit 1
 }
 
+# With the built apworld installed (the prepared state, or what is left of it), a link would
+# shadow it: Archipelago loads world folders first and skips an .apworld whose game is loaded.
+# fuzzer_cleanup.ps1 and restore_archipelago.ps1 both remove it before they come here.
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
+if ((Test-Path $KdamgInstalledApWorld) -or (Test-Path $KdamgStateFile)) {
+    Write-Error (Get-StateError -State (Get-BuildState) -Allowed @("development") -Action "Creating the world link")
+    exit 1
+}
+
 # The Build APWorlds component resolves the world folder as worlds\<name> relative to the
 # Archipelago root and only considers worlds loaded from a folder, so the apworld has to be
 # reachable there. A link keeps the single source of truth in this repository.

@@ -20,6 +20,10 @@ if (-not (Test-Path $PythonExe)) {
           "Run scripts\setup.ps1 to create one, or pass -PythonExe."
 }
 
+# The build goes through the world link, which only the development state has.
+. (Join-Path $PSScriptRoot "build\build_state.ps1")
+$null = Assert-BuildState -Allowed @("development") -Action "Building the apworld"
+
 # Refreshes the collected release zips and regenerates patches\data.py. It runs after the guards
 # above because it needs $PythonExe, and its exit code is checked because it leaves the previous
 # data.py and zips untouched when it fails -- without this the build would carry on and package

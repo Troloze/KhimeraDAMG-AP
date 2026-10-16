@@ -128,7 +128,8 @@ following it, because the world link points at `khimera_damg/` in this repositor
 **The world link.** `scripts/setup/setup_world_link.ps1` creates a junction at
 `Archipelago/worlds/khimera_damg` pointing at `khimera_damg/`, and records it in the clone's
 local `info/exclude` so it never shows up as untracked there. It replaces a junction that points
-anywhere else. It has to be in `worlds/`, not `custom_worlds/`:
+anywhere else, and refuses to run while a built `.apworld` is installed; the link is absent on
+purpose in the prepared state (see "Build states"). It has to be in `worlds/`, not `custom_worlds/`:
 
 - Archipelago imports every world as `worlds.<name>`, which only `Archipelago/worlds/` and the
   `.apworld` meta-path finder can satisfy. A folder in `custom_worlds/` is found while indexing but
@@ -237,7 +238,9 @@ loads the world with no version or metadata, and from core 0.7.0 on it will refu
   the two routinely differ.
 - `scripts/run_tests.ps1` runs the apworld's own tests and, with `-Core`, Archipelago's core
   suite; see "The apworld's test suite" below. `scripts/run_ruff.ps1` lints the apworld, tests
-  included. `scripts/run_fuzzer.ps1` runs the fuzzer; see "Running the fuzzer" below.
+  included. `scripts/run_fuzzer.ps1` runs the fuzzer and `scripts/run_index_tests.ps1` the full
+  core suite against the build; both need the prepared state. See "Running the fuzzer" below,
+  and "Build states" in it for which script needs which state.
 - Building, copying, and generating all write files. Propose the commands and wait to be
   asked, the same as any other change. Running the tests is read-only for this repository (see
   below), so it falls under rule 3.
@@ -436,18 +439,17 @@ them as a standing checklist, raise any violation you find, and report index rea
 - **No obvious logic flaws** that make large multiworlds hard to generate. Direct use of the
   global `random` module is called out by name (see the correctness rules above), as are test
   failures "deemed problematic".
-- **The world must pass all core unit tests.** Run Archipelago's own suite with the built
-  `.apworld` in `Archipelago/custom_worlds/` and the world link removed, since a world folder of
-  the same name would be loaded instead of the `.apworld` (see "Running the fuzzer"). No script
-  does this yet. By hand: build, delete the link (the junction itself, not its target), copy
-  `Archipelago/build/apworlds/khimera_damg.apworld` into `Archipelago/custom_worlds/`, and from
-  `Archipelago/` run `..\.py-env\venv\Scripts\python.exe -B -m unittest discover -s test/general -t .`
-  (about 90 seconds, every world). Then delete the copied `.apworld` and run
-  `scripts/setup/setup_world_link.ps1`. The `-t .` is required: without it unittest imports the
-  test modules as top-level modules instead of `test.general.*`, and nine of them fail to import
-  whatever the world does. A failure there blocks inclusion on its own, separately from the
-  fuzzer. `scripts/run_tests.ps1 -Core` is the quick source-tree version of the same suite,
-  scoped to this world.
+- **The world must pass all core unit tests.** `scripts/run_index_tests.ps1` runs Archipelago's
+  own suite the way the index does: from the `Archipelago/` root, every world, with the built
+  `.apworld` installed, as
+  `..\.py-env\venv\Scripts\python.exe -B -m unittest discover -s test/general -t .` (about 90
+  seconds). It needs the prepared state (see "Build states" below), so run
+  `scripts/fuzzer_prepare.ps1` first and `scripts/fuzzer_cleanup.ps1` afterwards; the same command
+  typed by hand from `Archipelago/` works too while prepared. The `-t .` is required: without it
+  unittest imports the test modules as top-level modules instead of `test.general.*`, and nine of
+  them fail to import whatever the world does. A failure there blocks inclusion on its own,
+  separately from the fuzzer. `scripts/run_tests.ps1 -Core` is the quick source-tree version of
+  the same suite, scoped to this world.
 - **Generation failure rate below 1%**, measured with Eijebong's fuzzer, not counting
   `OptionError`s. It is measured with `empty-apworld` (<https://github.com/ionium-ap/empty-apworld>,
   100 free locations) present in the same multiworld, so that failures caused by a restrictive
@@ -491,23 +493,42 @@ Run at merge time and worth passing, but not counted toward the 1%:
 ### Running the fuzzer
 
 The workflow is established and scripted. `docs/Running the Fuzzer.md` is the full runbook; in
-short, `scripts/run_fuzzer.ps1 -Setup` once, then `scripts/run_fuzzer.ps1 -Pass <pass>` per run.
+short:
 
-The fuzzer runs inside `Archipelago/`, on the `.py-env/venv` venv. `fuzz.py` has to run from the
-Archipelago root, because Archipelago resolves `custom_worlds/` and its other folders next to the
-`__main__` script, so each run copies `fuzz.py` and `hooks/` there from `fuzzer/`. `-Setup`
-refreshes the upstream fuzzer in `fuzzer/` (keeping `khimera_damg.yaml`, the `empty-apworld/`
-clone and the `runs/` archives), clones `empty-apworld` again, and builds
-`Archipelago/custom_worlds/empty.apworld`.
+    scripts/run_fuzzer.ps1 -Setup             # once, and again to refresh the fuzzer
+    scripts/fuzzer_prepare.ps1                # build and enter the prepared state
+    scripts/run_fuzzer.ps1 -Pass <pass>       # as many runs as needed
+    scripts/fuzzer_cleanup.ps1                # back to the development state
 
-Each run builds a real `.apworld` through `scripts/build_apworld.ps1`, then removes the world link
-and copies the `.apworld` into `Archipelago/custom_worlds/` for the length of the passes.
-Archipelago loads world folders first and skips an `.apworld` whose game is already loaded, so
-with the link in place the source would be fuzzed and the build ignored. A `finally` block removes
-the `.apworld` and recreates the link afterwards, including after a failed pass or Ctrl+C; if the
-process is killed outright, `scripts/setup/setup_world_link.ps1` puts the link back.
-`run_fuzz_pass.ps1` also refuses to start a pass while a world folder would shadow the installed
-`.apworld`.
+The fuzzer runs inside `Archipelago/`, on the `.py-env/venv` venv. `fuzz.py` puts its own folder
+on `sys.path` to import Archipelago, so it has to sit in the Archipelago root; `fuzzer_prepare.ps1`
+copies it and `hooks/` there from `fuzzer/`. `-Setup` refreshes the upstream fuzzer in `fuzzer/`
+(keeping `khimera_damg.yaml`, the `empty-apworld/` clone and the `runs/` archives), clones
+`empty-apworld` again, and builds `Archipelago/custom_worlds/empty.apworld`.
+
+#### Build states
+
+The fuzzer and the full core suite test the built `.apworld`, while building, the apworld's own
+tests and Pylance need the world link. The two cannot coexist: Archipelago loads world folders
+first and skips an `.apworld` whose game is already loaded, so with the link in place the source
+would be tested and the build ignored. `Archipelago/` is therefore always in one of two states,
+which `scripts/build/build_state.ps1` defines and every build, test and fuzzer script checks:
+
+- **Development** — the link points at `khimera_damg/` and no build is installed.
+  `build_apworld.ps1`, `build_and_replace.ps1`, `run_tests.ps1` and `setup_world_link.ps1` need it.
+- **Prepared** — entered by `scripts/fuzzer_prepare.ps1`, which builds (through the link), copies
+  in `fuzz.py`, `hooks/` and `empty.apworld`, removes the link, installs the build in
+  `Archipelago/custom_worlds/`, and writes `Archipelago/kdamg_prepared.json` with the build's hash
+  and a fingerprint of `khimera_damg/` (without `tests/`). `run_fuzzer.ps1` passes,
+  `run_fuzz_pass.ps1` and `run_index_tests.ps1` need it, and refuse a build that no longer matches
+  the source: after editing `khimera_damg/`, run `fuzzer_prepare.ps1` again, which cleans up and
+  rebuilds. `scripts/fuzzer_cleanup.ps1` returns to development.
+
+Anything else, such as a run killed half-way through a prepare, is ambiguous. Every script then
+stops, lists what is wrong, and points at `scripts/restore_archipelago.ps1`, which always ends in
+the development state. Nothing tries to guess its way out. Keeping the two transitions in their
+own scripts, rather than inside the runners, means every automated check can also be run by a
+human: prepare once, then run the scripts or the underlying commands by hand.
 
 The script runs one `fuzz.py` invocation per pass, following the rules above, through
 `scripts/fuzzer/run_fuzz_pass.ps1`, which holds the pass table:
@@ -526,7 +547,8 @@ The script runs one `fuzz.py` invocation per pass, following the rules above, th
 Defaults: `-Runs 500 -Jobs 16 -Yamls 1 -Timeout 15`, with `fuzzer/khimera_damg.yaml` passed as
 an absolute path unless `-NoMeta`. Each pass is archived to `fuzzer/runs/<timestamp>/<pass>/`
 (command line, fuzz.py's own output, and a `result.json`), with a `run.json` recording the apworld
-hash and the commits of this repository, of `Archipelago/` and of the fuzzer. The script exits
+hash, the source fingerprint, when the prepare happened, and the commits of this repository, of
+`Archipelago/` and of the fuzzer. The script exits
 non-zero when any pass is not `ok`. `fuzz.py` flags, for reference: `-r` generations
 (mandatory), `-j` parallel jobs, `-g` world (repeatable), `-n` YAMLs per generation, `-t` timeout,
 `-m` fuzz-meta file, `--hook module:class`, `--skip-output` stops before `generate_output`,

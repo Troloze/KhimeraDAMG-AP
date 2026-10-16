@@ -53,8 +53,9 @@ param(
 )
 
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-# fuzz.py has to run from the Archipelago root: Archipelago resolves custom_worlds and its other
-# folders next to the __main__ script. scripts/run_fuzzer.ps1 copies it and the hooks there.
+# fuzz.py puts its own folder on sys.path to import Archipelago, so it runs from the Archipelago
+# root, where scripts/fuzzer_prepare.ps1 copies it and the hooks.
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "build\build_state.ps1")
 $FuzzRoot = Join-Path $Root "Archipelago"
 $VenvPython = Join-Path $Root ".py-env\venv\Scripts\python.exe"
 $FuzzOutput = Join-Path $FuzzRoot "fuzz_output"
@@ -166,16 +167,13 @@ $Definition = $PassTable[$Pass]
 if (-not (Test-Path $VenvPython)) {
     Stop-Pass "The build venv was not found at $VenvPython. Run scripts/setup.ps1 first."
 }
-if (-not (Test-Path (Join-Path $FuzzRoot "fuzz.py"))) {
-    Stop-Pass "fuzz.py is missing from $FuzzRoot. Run passes through scripts/run_fuzzer.ps1, which copies it there."
+# The prepared state, with a build that still matches khimera_damg\. It also guarantees that the
+# world link is gone, without which the source would be fuzzed in place of the installed build.
+try {
+    $null = Assert-PreparedBuildCurrent -Action "The $Pass pass"
 }
-
-# Archipelago loads world folders before .apworld files and skips an .apworld whose game is
-# already loaded, so a folder of the same name would be fuzzed in place of the installed build.
-$WorldFolder = Join-Path $FuzzRoot "worlds\$Game"
-if ((Test-Path $WorldFolder) -and (Test-Path (Join-Path $FuzzRoot "custom_worlds\$Game.apworld"))) {
-    Stop-Pass ("$WorldFolder exists, so custom_worlds\$Game.apworld would not be loaded. " +
-               "scripts/run_fuzzer.ps1 removes the world link for the length of a run.")
+catch {
+    Stop-Pass $_.Exception.Message
 }
 
 $Hooks = @()
@@ -183,7 +181,7 @@ if ($Definition.Empty) {
     $Hooks += "hooks.with_empty:Hook"
     if (-not (Test-Path (Join-Path $FuzzRoot "custom_worlds\empty.apworld"))) {
         Stop-Pass ("custom_worlds\empty.apworld is missing, so the Empty world cannot be added. " +
-                   "Run scripts/fuzzer/build_empty_apworld.ps1 or scripts/run_fuzzer.ps1 -Setup.")
+                   "Run scripts/fuzzer/build_empty_apworld.ps1, or scripts/fuzzer_prepare.ps1 again.")
     }
 }
 $Hooks += $Definition.Hooks
@@ -192,7 +190,7 @@ foreach ($hook in $Hooks) {
     $module = ($hook -split ":")[0]
     $file = Join-Path $FuzzRoot (($module -replace "\.", "\") + ".py")
     if (-not (Test-Path $file)) {
-        Stop-Pass "Hook $hook is not in $FuzzRoot ($file). Run scripts/run_fuzzer.ps1 -Setup."
+        Stop-Pass "Hook $hook is not in $FuzzRoot ($file). Run scripts/run_fuzzer.ps1 -Setup, then scripts/fuzzer_prepare.ps1."
     }
 }
 

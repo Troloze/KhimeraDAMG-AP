@@ -7,14 +7,17 @@
 .DESCRIPTION
     The tests live in khimera_damg/tests and are run with stdlib unittest through the
     build venv in .py-env\venv, so nothing extra has to be installed. Archipelago itself is imported
-    from the submodule, and the apworld is reached through the junction that setup_world_link.ps1
-    creates at Archipelago/worlds/khimera_damg.
+    from Archipelago/, and the apworld is reached through the junction that setup_world_link.ps1
+    creates at Archipelago/worlds/khimera_damg. That needs Archipelago/ in the development state
+    (scripts/build/build_state.ps1); while it is prepared for the fuzzer, run
+    scripts/fuzzer_cleanup.ps1 first. The full core suite against the built apworld, the way the
+    index runs it, is scripts/run_index_tests.ps1.
 
     Nothing is written inside Archipelago/ or inside this repository:
 
-      - the working directory is a throwaway folder under TEMP, seeded with a copy of the
-        submodule's host.yaml when it has one, so the settings module loads that copy instead of
-        creating one in the submodule;
+      - the working directory is a throwaway folder under TEMP, seeded with a copy of
+        Archipelago/host.yaml when it has one, so the settings module loads that copy instead of
+        creating one in Archipelago/;
       - PYTHONDONTWRITEBYTECODE stops __pycache__ folders appearing through the junction;
       - AP_TEST_WORLDS=khimera_damg keeps every other world out of the run, which also makes it
         about ten times faster.
@@ -68,8 +71,12 @@ if (-not (Test-Path $PythonExe)) {
     Write-Error "Python not found at $PythonExe. Run scripts/setup.ps1 first."
     exit 1
 }
-if (-not (Test-Path $WorldLink)) {
-    Write-Error "The world link at $WorldLink is missing. Run scripts/setup/setup_world_link.ps1."
+. (Join-Path $PSScriptRoot "build\build_state.ps1")
+try {
+    $null = Assert-BuildState -Allowed @("development") -Action "Running the tests"
+}
+catch {
+    Write-Error $_.Exception.Message
     exit 1
 }
 if (-not (Test-Path $TestsDir)) {

@@ -5,18 +5,17 @@
     Runs Eijebong's fuzzer (ionium-ap/Archipelago-fuzzer) against the apworld, one pass at a time.
 
 .DESCRIPTION
-    Fuzzes inside Archipelago\, the same clone the apworld is built and tested against. Each run
-    copies fuzz.py and its hooks from fuzzer\ into Archipelago\, builds the apworld fresh, and runs
-    the requested passes through scripts\fuzzer\run_fuzz_pass.ps1. Every pass is archived under
-    fuzzer\runs\<timestamp>\<pass>\ with its command line, fuzz.py's own output and a
-    result.json. A summary table follows the last pass.
+    Fuzzes the built apworld inside Archipelago\. The passes need Archipelago\ in the prepared
+    state, which scripts\fuzzer_prepare.ps1 enters: the apworld built and installed in
+    Archipelago\custom_worlds, the world link removed, and fuzz.py, hooks\ and empty.apworld in
+    place. This script never builds and never touches the world link. It refuses to run when
+    Archipelago\ is not prepared, or when khimera_damg\ has changed since the prepare
+    (scripts\build\build_state.ps1). scripts\fuzzer_cleanup.ps1 returns to the development state
+    afterwards.
 
-    For the length of the passes the world link at Archipelago\worlds\khimera_damg is removed and
-    the built .apworld is installed in Archipelago\custom_worlds instead. Archipelago loads world
-    folders first and skips an .apworld whose game is already loaded, so with the link in place
-    the source would be fuzzed rather than the build. Afterwards the .apworld is removed and the
-    link recreated, even when a pass fails or the run is interrupted with Ctrl+C. If the process
-    is killed outright, scripts\setup\setup_world_link.ps1 puts the link back.
+    The requested passes run through scripts\fuzzer\run_fuzz_pass.ps1. Every pass is archived
+    under fuzzer\runs\<timestamp>\<pass>\ with its command line, fuzz.py's own output and a
+    result.json. A summary table follows the last pass.
 
     Why passes: each checking hook turns every outcome it is not testing into a success or an
     OptionError, so a run with several hooks loaded cannot report a failure at all. The failure
@@ -27,8 +26,9 @@
 
 .PARAMETER Setup
     Refresh the fuzzer clone in fuzzer\ (keeping khimera_damg.yaml, empty-apworld\ and runs\),
-    clone empty-apworld again and rebuild empty.apworld. Then stop, unless -Pass is also given.
-    Needs Archipelago\ and the build venv from scripts\setup.ps1.
+    copy fuzz.py and hooks\ into Archipelago\, clone empty-apworld again and rebuild
+    empty.apworld. Then stop, unless -Pass is also given. Works in the development and the
+    prepared state, and changes neither.
 
 .PARAMETER Pass
     One or more of:
@@ -54,18 +54,16 @@
 .PARAMETER NoMeta
     Do not pass a fuzz-meta file.
 
-.PARAMETER SkipBuild
-    Reuse the apworld already in Archipelago\build\apworlds instead of building one.
-
 .PARAMETER ExtraArgs
     Extra arguments for fuzz.py, added to every pass. --hook is refused: pick a pass instead.
 
 .EXAMPLE
     scripts/run_fuzzer.ps1 -Setup
+    scripts/fuzzer_prepare.ps1
     scripts/run_fuzzer.ps1
     scripts/run_fuzzer.ps1 -Pass checks -Runs 200
-    scripts/run_fuzzer.ps1 -Pass all
     scripts/run_fuzzer.ps1 -Pass canary
+    scripts/fuzzer_cleanup.ps1
 #>
 
 param(
@@ -77,27 +75,18 @@ param(
     [int] $Timeout = 15,
     [string] $Meta = (Join-Path (Split-Path $PSScriptRoot -Parent) "fuzzer\khimera_damg.yaml"),
     [switch] $NoMeta,
-    [switch] $SkipBuild,
     [string[]] $ExtraArgs = @()
 )
 
-$Root = Split-Path $PSScriptRoot -Parent
-$ApRoot = Join-Path $Root "Archipelago"
-$BuildScript = Join-Path $PSScriptRoot "build_apworld.ps1"
-$LinkScript = Join-Path $PSScriptRoot "setup\setup_world_link.ps1"
+. (Join-Path $PSScriptRoot "build\build_state.ps1")
+
 $EmptyScript = Join-Path $PSScriptRoot "fuzzer\build_empty_apworld.ps1"
 $CanaryScript = Join-Path $PSScriptRoot "fuzzer\build_canary_apworld.ps1"
 $PassScript = Join-Path $PSScriptRoot "fuzzer\run_fuzz_pass.ps1"
-$BuiltApWorld = Join-Path $ApRoot "build\apworlds\khimera_damg.apworld"
-$WorldLink = Join-Path $ApRoot "worlds\khimera_damg"
-$CustomWorldsDir = Join-Path $ApRoot "custom_worlds"
-$ApWorldPath = Join-Path $CustomWorldsDir "khimera_damg.apworld"
-$EmptyApWorld = Join-Path $CustomWorldsDir "empty.apworld"
-$VenvPython = Join-Path $Root ".py-env\venv\Scripts\python.exe"
-$FuzzerDir = Join-Path $Root "fuzzer"
-$FuzzerStaging = Join-Path $FuzzerDir "upstream-staging"
+$VenvPython = Join-Path $KdamgRoot ".py-env\venv\Scripts\python.exe"
+$FuzzerStaging = Join-Path $KdamgFuzzerDir "upstream-staging"
 $FuzzerUrl = "https://github.com/ionium-ap/Archipelago-fuzzer"
-$RunsRoot = Join-Path $FuzzerDir "runs"
+$RunsRoot = Join-Path $KdamgFuzzerDir "runs"
 
 # fuzzer\ holds the upstream fuzzer next to a few things of this repository's own. A refresh
 # replaces everything else and leaves these alone.
@@ -127,25 +116,16 @@ function Get-Commit {
     return $sha.Trim()
 }
 
-function Assert-Environment {
-    if (-not (Test-Path (Join-Path $ApRoot "worlds\Files.py"))) {
-        throw "Archipelago is not set up at $ApRoot. Run scripts\setup.ps1 first."
-    }
-    if (-not (Test-Path $VenvPython)) {
-        throw "The build venv was not found at $VenvPython. Run scripts\setup.ps1 first."
-    }
-}
-
 function Update-Fuzzer {
     # Clone next to the old copy and swap only once the clone succeeded, so a failed clone leaves
     # the previous fuzzer in place instead of nothing.
-    New-Item -ItemType Directory -Path $FuzzerDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $KdamgFuzzerDir -Force | Out-Null
     if (Test-Path $FuzzerStaging) {
         Remove-Item $FuzzerStaging -Recurse -Force -ErrorAction Stop
     }
     git clone --depth 1 $FuzzerUrl $FuzzerStaging | Out-Host
     if ($LASTEXITCODE -ne 0) {
-        throw "git clone of $FuzzerUrl failed. The previous copy in $FuzzerDir is untouched."
+        throw "git clone of $FuzzerUrl failed. The previous copy in $KdamgFuzzerDir is untouched."
     }
     $commit = (git -C $FuzzerStaging rev-parse HEAD).Trim()
 
@@ -156,13 +136,13 @@ function Update-Fuzzer {
     $upstream = @(Get-ChildItem $FuzzerStaging -Force)
     foreach ($entry in $upstream) {
         if ($KeepInFuzzer -contains $entry.Name) {
-            throw ("The fuzzer now ships $($entry.Name), which is a name this repository keeps in $FuzzerDir. " +
-                   "The previous copy is untouched; the new clone is in $FuzzerStaging.")
+            throw ("The fuzzer now ships $($entry.Name), which is a name this repository keeps in " +
+                   "$KdamgFuzzerDir. The previous copy is untouched; the new clone is in $FuzzerStaging.")
         }
     }
 
     # Replace the upstream part wholesale, so a file removed upstream does not linger.
-    foreach ($entry in @(Get-ChildItem $FuzzerDir -Force)) {
+    foreach ($entry in @(Get-ChildItem $KdamgFuzzerDir -Force)) {
         if ($KeepInFuzzer -notcontains $entry.Name) {
             try {
                 Remove-Item $entry.FullName -Recurse -Force -ErrorAction Stop
@@ -174,41 +154,25 @@ function Update-Fuzzer {
         }
     }
     foreach ($entry in $upstream) {
-        Move-Item $entry.FullName $FuzzerDir -ErrorAction Stop
+        Move-Item $entry.FullName $KdamgFuzzerDir -ErrorAction Stop
     }
     Remove-Item $FuzzerStaging -Recurse -Force -ErrorAction Stop
 
     # Everything in fuzzer\ is ignored except the fuzz-meta file, which is tracked.
-    Set-Content -Path (Join-Path $FuzzerDir ".gitignore") -Value @("*", "!khimera_damg.yaml") -Encoding ascii
-    Set-Content -Path (Join-Path $FuzzerDir "COMMIT") -Value $commit -Encoding ascii
-    Write-Host "Fuzzer at $commit in $FuzzerDir"
-}
-
-function Install-FuzzerFiles {
-    # fuzz.py has to run from the Archipelago root, since Archipelago resolves custom_worlds and
-    # its other folders next to the __main__ script. restore_archipelago.ps1 deletes the copies,
-    # so they are put back before every run rather than only by -Setup.
-    $fuzzPy = Join-Path $FuzzerDir "fuzz.py"
-    if (-not (Test-Path $fuzzPy)) {
-        throw "The fuzzer is not set up in $FuzzerDir. Run with -Setup first."
-    }
-    Copy-Item $fuzzPy $ApRoot -Force -ErrorAction Stop
-
-    # Replace the hooks folder rather than copying over it, so a hook removed upstream does not
-    # linger in Archipelago\.
-    $apHooks = Join-Path $ApRoot "hooks"
-    if (Test-Path $apHooks) {
-        Remove-Item $apHooks -Recurse -Force -ErrorAction Stop
-    }
-    Copy-Item (Join-Path $FuzzerDir "hooks") $apHooks -Recurse -ErrorAction Stop
+    Set-Content -Path (Join-Path $KdamgFuzzerDir ".gitignore") -Value @("*", "!khimera_damg.yaml") -Encoding ascii
+    Set-Content -Path (Join-Path $KdamgFuzzerDir "COMMIT") -Value $commit -Encoding ascii
+    Write-Host "Fuzzer at $commit in $KdamgFuzzerDir"
 }
 
 function Invoke-Setup {
     # Never stand inside a folder this is about to replace: Windows refuses to delete a directory
     # that is any process's working directory.
-    Push-Location $Root
+    Push-Location $KdamgRoot
     try {
-        Assert-Environment
+        $null = Assert-BuildState -Allowed @("development", "prepared") -Action "Setting up the fuzzer"
+        if (-not (Test-Path $VenvPython)) {
+            throw "The build venv was not found at $VenvPython. Run scripts\setup.ps1 first."
+        }
         Update-Fuzzer
         Install-FuzzerFiles
 
@@ -218,61 +182,6 @@ function Invoke-Setup {
     }
     finally {
         Pop-Location
-    }
-}
-
-function Build-ApWorld {
-    if ($SkipBuild) {
-        if (-not (Test-Path $BuiltApWorld)) {
-            throw "-SkipBuild was given, but there is no apworld at $BuiltApWorld to reuse."
-        }
-        $age = (Get-Item $BuiltApWorld).LastWriteTime
-        Write-Warning "Reusing the apworld built at $age; changes made since then are not being fuzzed."
-        return
-    }
-
-    # The build goes through the world link, which an interrupted run may have left removed.
-    & $LinkScript
-    if ($LASTEXITCODE -ne 0) {
-        throw "The world link at $WorldLink could not be created, so the apworld cannot be built."
-    }
-
-    # It has to come from the build component, not a hand-made zip, which would lack
-    # version/compatible_version in its manifest and load with no metadata at all.
-    $started = Get-Date
-    & $BuildScript
-    if ($LASTEXITCODE -ne 0) {
-        throw "scripts\build_apworld.ps1 failed with exit code $LASTEXITCODE."
-    }
-    if (-not (Test-Path $BuiltApWorld) -or (Get-Item $BuiltApWorld).LastWriteTime -lt $started) {
-        throw "scripts\build_apworld.ps1 did not produce a fresh $BuiltApWorld."
-    }
-}
-
-function Install-ApWorld {
-    # Remove the world link so the .apworld below is what Archipelago loads; see the description.
-    $link = Get-Item $WorldLink -Force -ErrorAction SilentlyContinue
-    if ($link) {
-        if (-not $link.LinkType) {
-            throw "$WorldLink is a real folder, not the world link, so the built apworld would never be loaded."
-        }
-        # DirectoryInfo.Delete() removes the link itself; Remove-Item can recurse into its target.
-        $link.Delete()
-    }
-
-    if (-not (Test-Path $CustomWorldsDir)) {
-        New-Item -ItemType Directory -Path $CustomWorldsDir | Out-Null
-    }
-    Copy-Item $BuiltApWorld $ApWorldPath -Force -ErrorAction Stop
-}
-
-function Restore-WorldLink {
-    if (Test-Path $ApWorldPath) {
-        Remove-Item $ApWorldPath -Force -ErrorAction SilentlyContinue
-    }
-    & $LinkScript
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Could not recreate the world link. Run scripts\setup\setup_world_link.ps1." -ForegroundColor Red
     }
 }
 
@@ -320,7 +229,10 @@ if ($Setup) {
 
 try {
     $Passes = Resolve-Passes
-    Assert-Environment
+    if (-not (Test-Path $VenvPython)) {
+        throw "The build venv was not found at $VenvPython. Run scripts\setup.ps1 first."
+    }
+    $Recorded = Assert-PreparedBuildCurrent -Action "Fuzzing"
 }
 catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
@@ -336,25 +248,6 @@ if (-not $NoMeta) {
     $MetaPath = (Resolve-Path $Meta).Path
 }
 
-try {
-    Push-Location $Root
-    try {
-        Install-FuzzerFiles
-        # restore_archipelago.ps1 deletes custom_worlds along with everything else untracked.
-        if (-not (Test-Path $EmptyApWorld)) {
-            & $EmptyScript
-        }
-    }
-    finally {
-        Pop-Location
-    }
-    Build-ApWorld
-}
-catch {
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    exit 1
-}
-
 # --- Passes -----------------------------------------------------------------------------------
 
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -362,7 +255,7 @@ $RunDir = Join-Path $RunsRoot $Stamp
 New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
 
 $FuzzerCommit = "unknown"
-$CommitFile = Join-Path $FuzzerDir "COMMIT"
+$CommitFile = Join-Path $KdamgFuzzerDir "COMMIT"
 if (Test-Path $CommitFile) {
     $FuzzerCommit = (Get-Content $CommitFile -Raw).Trim()
 }
@@ -375,9 +268,11 @@ $RunInfo = [ordered] @{
     timeout = $Timeout
     meta = $MetaPath
     extra_args = @($ExtraArgs)
-    apworld_sha256 = (Get-FileHash $BuiltApWorld -Algorithm SHA256).Hash
-    repository_commit = Get-Commit $Root
-    archipelago_commit = Get-Commit $ApRoot
+    apworld_sha256 = $Recorded.apworld_sha256
+    source_fingerprint = $Recorded.source_fingerprint
+    prepared_at = $Recorded.prepared_at
+    repository_commit = Get-Commit $KdamgRoot
+    archipelago_commit = Get-Commit $KdamgApRoot
     fuzzer_commit = $FuzzerCommit
 }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -392,52 +287,36 @@ $Common = @{
 }
 
 $Labels = New-Object System.Collections.Generic.List[string]
-$RunError = $null
-try {
-    Install-ApWorld
+foreach ($name in $Passes) {
+    if ($name -ne "canary") {
+        $passMeta = ""
+        if ($MetaPath) {
+            $passMeta = $MetaPath
+        }
+        & $PassScript -Pass $name -Label $name -Runs $Runs -Meta $passMeta @Common
+        $Labels.Add($name)
+        continue
+    }
 
-    foreach ($name in $Passes) {
-        if ($name -ne "canary") {
-            $passMeta = ""
-            if ($MetaPath) {
-                $passMeta = $MetaPath
-            }
-            & $PassScript -Pass $name -Label $name -Runs $Runs -Meta $passMeta @Common
-            $Labels.Add($name)
-            continue
-        }
-
-        try {
-            & $CanaryScript
-        }
-        catch {
-            Write-Host "Building the canary failed: $($_.Exception.Message)" -ForegroundColor Red
-            $Labels.Add("canary-build")
-            continue
-        }
-        try {
-            foreach ($canaryPass in $CanaryPasses) {
-                $label = "canary-$canaryPass"
-                & $PassScript -Pass $canaryPass -Label $label -Game "kdamg_canary" -Runs ([Math]::Min($Runs, 50)) `
-                    -ExpectFailures @Common
-                $Labels.Add($label)
-            }
-        }
-        finally {
-            & $CanaryScript -Remove
+    try {
+        & $CanaryScript
+    }
+    catch {
+        Write-Host "Building the canary failed: $($_.Exception.Message)" -ForegroundColor Red
+        $Labels.Add("canary-build")
+        continue
+    }
+    try {
+        foreach ($canaryPass in $CanaryPasses) {
+            $label = "canary-$canaryPass"
+            & $PassScript -Pass $canaryPass -Label $label -Game "kdamg_canary" -Runs ([Math]::Min($Runs, 50)) `
+                -ExpectFailures @Common
+            $Labels.Add($label)
         }
     }
-}
-catch {
-    $RunError = $_.Exception.Message
-}
-finally {
-    Restore-WorldLink
-}
-
-if ($RunError) {
-    Write-Host "The run stopped: $RunError" -ForegroundColor Red
-    exit 1
+    finally {
+        & $CanaryScript -Remove
+    }
 }
 
 # --- Summary ----------------------------------------------------------------------------------
