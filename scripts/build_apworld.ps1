@@ -4,15 +4,16 @@ param(
 )
 
 $Root        = Split-Path $PSScriptRoot -Parent
-$Launcher    = Join-Path $Root "Archipelago\Launcher.py"
+$ApRoot      = Join-Path $Root "Archipelago"
+$Launcher    = Join-Path $ApRoot "Launcher.py"
 $Prepare     = Join-Path $PSScriptRoot "build\prepare_patches.py"
 $GameName    = "Khimera: Destroy All Monster Girls"
-$OutputFile  = Join-Path $Root "build\apworlds\khimera_damg.apworld"
+$OutputFile  = Join-Path $ApRoot "build\apworlds\khimera_damg.apworld"
 $PatchSource = Join-Path $Root "KhimeraDAMG-AP-Mod\releases"
 $PatchDest   = Join-Path $Root "khimera_damg\patches"
 
 if (-not (Test-Path $Launcher)) {
-    throw "Archipelago submodule not checked out: $Launcher is missing."
+    throw "Archipelago is not set up: $Launcher is missing. Run scripts\setup\setup_archipelago.ps1."
 }
 if (-not (Test-Path $PythonExe)) {
     throw "No build environment at $PythonExe. " +
@@ -39,7 +40,10 @@ if (Test-Path $OutputFile) {
     Remove-Item $OutputFile -Force
 }
 
-Push-Location $Root
+# The component reads the world's files from worlds\<name> and writes build\apworlds, both
+# relative to the working directory. From the Archipelago root, worlds\khimera_damg is the world
+# link, so the files it packages are the ones this repository holds.
+Push-Location $ApRoot
 try {
     & $PythonExe $Launcher "Build APWorlds" -- --skip_open_folder $GameName
 } finally {

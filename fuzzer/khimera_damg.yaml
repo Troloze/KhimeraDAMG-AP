@@ -1,11 +1,12 @@
 # AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.
 #
 # Fuzz constraints for khimera_damg, in the format read by Eijebong's fuzzer
-# (https://github.com/ionium-ap/Archipelago-fuzzer) via its -m flag. Mirrors the path the
-# ionium index itself uses (fuzz-meta/khimera_damg.yaml), so this file can be copied there
-# directly if the index ever needs one.
+# (https://github.com/ionium-ap/Archipelago-fuzzer) via its -m flag. The ionium index keeps its
+# copy at fuzz-meta/khimera_damg.yaml, so this file can be copied there directly if the index
+# ever needs one. It is the one tracked file in fuzzer/: the .gitignore there, which
+# scripts/run_fuzzer.ps1 -Setup generates, ignores everything else.
 #
-# Currently empty: no combination of the options in worlds/khimera_damg/generation_options.py
+# Currently empty: no combination of the options in khimera_damg/generation_options.py
 # is invalid. They are a single-value Choice (victory_condition), four independent Toggles
 # (the shuffle_* options), a Range (trap_weight), five trap frequency Choices (balls_trap,
 # floof_aviator_swarm_trap, kiran_drive_by_trap, box_trap, random_enemy_trap), death_link and
@@ -16,6 +17,6 @@
 # The game key below has to stay even while it is empty: a file with no mapping at all loads as
 # None, and the fuzzer then crashes with "'NoneType' object has no attribute 'get'" before any
 # generation. The key is quoted because the game name contains a colon. fuzz.py runs from
-# _ignore_/ap-fuzz, so pass this file's absolute path; scripts/run_fuzzer.ps1 does that itself.
+# Archipelago/, so pass this file's absolute path; scripts/run_fuzzer.ps1 does that itself.
 
 "Khimera: Destroy All Monster Girls": {}

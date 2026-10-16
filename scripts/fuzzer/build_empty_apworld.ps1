@@ -5,22 +5,24 @@ param(
 )
 
 $Root        = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$FuzzRoot    = Join-Path $Root "fuzz-env\ap-fuzz"
-$Clone       = Join-Path $Root "fuzz-env\empty-apworld"
+$ApRoot      = Join-Path $Root "Archipelago"
+$FuzzerDir   = Join-Path $Root "fuzzer"
+$Clone       = Join-Path $FuzzerDir "empty-apworld"
 $WorldSource = Join-Path $Clone "empty"
-$FilesPy     = Join-Path $FuzzRoot "worlds\Files.py"
-$Stage       = Join-Path $Root "fuzz-env\empty-build"
-$OutputFile  = Join-Path $FuzzRoot "custom_worlds\empty.apworld"
-$StaticDir   = Join-Path $FuzzRoot "static_worlds"
+$FilesPy     = Join-Path $ApRoot "worlds\Files.py"
+$Stage       = Join-Path $FuzzerDir "empty-build"
+$OutputFile  = Join-Path $ApRoot "custom_worlds\empty.apworld"
+$StaticDir   = Join-Path $ApRoot "static_worlds"
 $StaticYaml  = Join-Path $StaticDir "empty.yaml"
+$VenvPython  = Join-Path $Root ".py-env\venv\Scripts\python.exe"
 $RepoUrl     = "https://github.com/ionium-ap/empty-apworld"
 
 if (-not (Test-Path $FilesPy)) {
-    throw "Fuzzer worktree not found at $FuzzRoot. Run scripts\run_fuzzer.ps1 -Setup first."
+    throw "Archipelago is not set up at $ApRoot. Run scripts\setup.ps1 first."
 }
 
-# Everything here lives under fuzz-env\, which the root .gitignore excludes wholesale, so unlike
-# the fuzzer clone in /fuzzer this one can keep its own .git and be pulled or re-pinned by hand.
+# The clone lives under fuzzer\, whose generated .gitignore ignores everything but the fuzz-meta
+# file, so it can keep its own .git and be pulled or re-pinned by hand.
 if ((Test-Path $Clone) -and $Force) {
     Remove-Item $Clone -Recurse -Force
 }
@@ -36,8 +38,8 @@ if (-not (Test-Path $WorldSource)) {
 
 # empty-apworld's archipelago.json omits version/compatible_version exactly the way ours does,
 # and APWorldContainer.read() raises InvalidDataError without them. Archipelago's build component
-# injects both from container_version in worlds/Files.py, so read that out of the very worktree
-# this artifact is going to be loaded by rather than hardcoding a number that can move upstream.
+# injects both from container_version in worlds/Files.py, so read that out of the very
+# Archipelago this artifact is going to be loaded by rather than hardcoding a number that can move.
 $Match = Select-String -Path $FilesPy -Pattern 'container_version:\s*int\s*=\s*(\d+)' | Select-Object -First 1
 if (-not $Match) {
     throw "Could not find container_version in $FilesPy."
@@ -93,11 +95,10 @@ $Yaml = @(
 
 # A manifest the container cannot read is the exact failure this script exists to avoid, and the
 # fuzzer would just silently run without the world, so load it the way Archipelago will.
-$VenvPython = Join-Path $FuzzRoot ".venv\Scripts\python.exe"
 if (Test-Path $VenvPython) {
     $Probe = "from worlds.Files import APWorldContainer; " +
              "c = APWorldContainer(r'$OutputFile'); c.read(); print(c.game)"
-    Push-Location $FuzzRoot
+    Push-Location $ApRoot
     try {
         $Output = & $VenvPython -c $Probe
     } finally {
