@@ -6,7 +6,7 @@
 
 .DESCRIPTION
     The tests live in khimera_damg/tests and are run with stdlib unittest through the
-    build venv in py-env, so nothing extra has to be installed. Archipelago itself is imported
+    build venv in .py-env\venv, so nothing extra has to be installed. Archipelago itself is imported
     from the submodule, and the apworld is reached through the junction that setup_world_link.ps1
     creates at Archipelago/worlds/khimera_damg.
 
@@ -54,7 +54,7 @@ param(
     [string] $Filter,
     [switch] $Detailed,
     [switch] $Durations,
-    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) "py-env\Scripts\python.exe")
+    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) ".py-env\venv\Scripts\python.exe")
 )
 
 $Root = Split-Path $PSScriptRoot -Parent

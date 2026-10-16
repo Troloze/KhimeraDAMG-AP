@@ -1,7 +1,7 @@
 # AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.
 
 param(
-    [string] $PythonVersion = "3.13.15",
+    [string] $PythonVersion = "3.11.9",
     [string] $ArchipelagoTag,
     [string] $ModTag,
     [switch] $Force

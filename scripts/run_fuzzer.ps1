@@ -72,7 +72,7 @@ param(
     [switch] $NoMeta,
     [switch] $SkipBuild,
     [string[]] $ExtraArgs = @(),
-    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) "python\python.exe")
+    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) ".py-env\python\python.exe")
 )
 
 $Root = Split-Path $PSScriptRoot -Parent

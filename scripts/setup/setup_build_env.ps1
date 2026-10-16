@@ -1,12 +1,12 @@
 # AI-GENERATED FILE: written by Claude (Anthropic), not hand-written by the developer.
 
 param(
-    [string] $PythonExe = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "python\python.exe"),
+    [string] $PythonExe = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) ".py-env\python\python.exe"),
     [switch] $Force
 )
 
 $Root         = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$Venv         = Join-Path $Root "py-env"
+$Venv         = Join-Path $Root ".py-env\venv"
 $VenvPython   = Join-Path $Venv "Scripts\python.exe"
 $ApRoot       = Join-Path $Root "Archipelago"
 $ModuleUpdate = Join-Path $ApRoot "ModuleUpdate.py"
@@ -49,12 +49,6 @@ Write-Host "Creating venv at $Venv from Python $BaseVersion"
 if (-not (Test-Path $VenvPython)) {
     Write-Error "venv creation did not produce $VenvPython"
     exit 1
-}
-
-# Self-ignore the way python/ and fuzzer/ do, so the repo root .gitignore needs no entry.
-$GitignorePath = Join-Path $Venv ".gitignore"
-if (-not (Test-Path $GitignorePath)) {
-    Set-Content -Path $GitignorePath -Value "*" -Encoding utf8
 }
 
 # ModuleUpdate.py is Archipelago's own installer. It resolves requirements.txt plus every

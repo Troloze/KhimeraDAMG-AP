@@ -1,6 +1,6 @@
 # AI-GENERATED FILE: Partially written by Claude (Anthropic), not fully hand-written by the developer.
 param(
-    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) "py-env\Scripts\python.exe")
+    [string] $PythonExe = (Join-Path (Split-Path $PSScriptRoot -Parent) ".py-env\venv\Scripts\python.exe")
 )
 
 $Root        = Split-Path $PSScriptRoot -Parent

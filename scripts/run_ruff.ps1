@@ -4,7 +4,7 @@ param(
 
 $Root = Split-Path $PSScriptRoot -Parent
 $RuffPath = Join-Path $Root "ruff.toml"
-$RuffExe = Join-Path $Root "py-env/Scripts/ruff.exe"
+$RuffExe = Join-Path $Root ".py-env/venv/Scripts/ruff.exe"
 
 if (-not (Test-Path $RuffExe)) {
     Write-Error "ruff was not found at $RuffExe. Run scripts/setup/setup_build_env.ps1 -Force to install it."
