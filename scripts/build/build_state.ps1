@@ -21,6 +21,9 @@
 
 $KdamgRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $KdamgApRoot = Join-Path $KdamgRoot "Archipelago"
+# The clone's git directory lives outside it (see Get-CloneGitDir in scripts\setup\repository.ps1),
+# so git has to be pointed at it: git -C Archipelago would find this repository's .git instead.
+$KdamgApGitDir = Join-Path $KdamgRoot ".repos\Archipelago.git"
 $KdamgWorldSource = Join-Path $KdamgRoot "khimera_damg"
 $KdamgWorldLink = Join-Path $KdamgApRoot "worlds\khimera_damg"
 $KdamgBuiltApWorld = Join-Path $KdamgApRoot "build\apworlds\khimera_damg.apworld"

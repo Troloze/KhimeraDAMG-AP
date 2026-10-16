@@ -76,7 +76,8 @@ apworld's test suite" below.
 
 Gitignored working folders, never committed: `.py-env/` (the standalone interpreter in
 `.py-env/python/` and the build venv in `.py-env/venv/`), `Archipelago/` and
-`KhimeraDAMG-AP-Mod/` (above), the contents of `fuzzer/` other than `khimera_damg.yaml`,
+`KhimeraDAMG-AP-Mod/` (above), `.repos/` (the git directories of those two clones; see "The two
+downloaded folders"), the contents of `fuzzer/` other than `khimera_damg.yaml`,
 `docs/report/` (landmark review reports, kept locally and never committed), and `testing/`
 (scratch space for throwaway tests, created only when needed — this folder is to stay gitignored
 permanently). Real tests belong in `khimera_damg/tests/`, not here.
@@ -108,10 +109,27 @@ Both take `-Tag`: `"latest"` is the highest tag in version order (a release outr
 `-rc` tags), `""` is the newest commit on the default branch, and any other value is that exact
 tag, which is an error when it does not exist. `scripts/setup.ps1` forwards `-ArchipelagoTag` and
 `-ModTag` to them. Each clone is depth 1, checked out detached, and records the commit it was set
-up at as `refs/kdamg/pinned` inside the clone. A folder that is already set up is left alone on a
-re-run, with a warning when the tag now points somewhere else; `-Force` deletes it and clones
-again. The tag is resolved before anything is deleted, so a mistyped tag leaves the folder as it
-was.
+up at as `refs/kdamg/pinned` in its git directory. A folder that is already set up is left alone on
+a re-run, with a warning when the tag now points somewhere else; `-Force` deletes it, together with
+its git directory, and clones again. The tag is resolved before anything is deleted, so a mistyped
+tag leaves the folder as it was.
+
+**Where the git directories live.** Neither folder has a `.git` of its own. Each clone's git
+directory sits outside it, at `.repos/Archipelago.git` and `.repos/KhimeraDAMG-AP-Mod.git`, and
+`.repos/` is gitignored too. This is done for two reasons:
+
+- With a `.git` inside, editors such as VS Code treat each folder as a nested repository of its own.
+- Git marks its pack files read-only. Deleting a folder that contains them by hand in Explorer
+  fails with an "administrator permission" prompt, even though nothing about the folder needs
+  administrator rights. With the git directory elsewhere, the two folders delete normally; `.repos/`
+  itself still has that problem, and the scripts handle it.
+
+`scripts/setup/repository.ps1` passes `--git-dir` and `--work-tree` to every git call on a clone.
+Never run `git -C Archipelago` or `git -C KhimeraDAMG-AP-Mod`: with no `.git` in the folder, git
+finds this repository's and silently acts on it instead. Run git by hand as
+`git --git-dir=.repos/Archipelago.git <command>` instead; it works from any folder, because each git
+directory records its work tree as `core.worktree`, relative to itself. The scripts that only need
+Archipelago's commit read it from `$KdamgApGitDir`, which `scripts/build/build_state.ps1` defines.
 
 To put a folder back after something went wrong:
 
@@ -119,15 +137,19 @@ To put a folder back after something went wrong:
     scripts/restore_mod.ps1
 
 A restore checks out the pinned commit, resets every tracked file, and deletes everything else,
-ignored files included. `-Reclone` deletes the folder and downloads the pinned commit again
-instead, and that is also what happens when the in-place restore fails. With no usable clone at
-all, the restore falls back to the setup script with `-Force`, which downloads its default tag.
+ignored files included. It works from the git directory, so a folder that was deleted by hand is
+checked out again without downloading anything; setup refuses that case and points at the restore.
+`-Reclone` deletes the folder and its git directory and downloads the pinned commit again
+instead, and that is also what happens when the in-place restore fails. With no usable git
+directory at all, the restore falls back to the setup script with `-Force`, which downloads its
+default tag. That includes a folder cloned before the git directories moved to `.repos/`.
 Before deleting or cleaning anything, the scripts remove every junction inside the folder without
 following it, because the world link points at `khimera_damg/` in this repository.
 
 **The world link.** `scripts/setup/setup_world_link.ps1` creates a junction at
 `Archipelago/worlds/khimera_damg` pointing at `khimera_damg/`, and records it in the clone's
-local `info/exclude` so it never shows up as untracked there. It replaces a junction that points
+local `info/exclude` (`.repos/Archipelago.git/info/exclude`) so it never shows up as untracked
+there. It replaces a junction that points
 anywhere else, and refuses to run while a built `.apworld` is installed; the link is absent on
 purpose in the prepared state (see "Build states"). It has to be in `worlds/`, not `custom_worlds/`:
 

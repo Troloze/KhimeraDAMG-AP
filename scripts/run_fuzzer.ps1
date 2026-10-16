@@ -107,9 +107,11 @@ $SinglePasses = @("rate") + $CountedChecks + @("determinism")
 $CanaryPasses = @("rate", "item_location_count")
 
 function Get-Commit {
-    param([string] $Path)
+    # Takes the git directory itself rather than a folder: Archipelago\ keeps its git directory
+    # outside the clone, and git -C there would report this repository's commit instead.
+    param([string] $GitDir)
 
-    $sha = git -C $Path rev-parse HEAD 2>$null
+    $sha = git --git-dir=$GitDir rev-parse HEAD 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $sha) {
         return "unknown"
     }
@@ -271,8 +273,8 @@ $RunInfo = [ordered] @{
     apworld_sha256 = $Recorded.apworld_sha256
     source_fingerprint = $Recorded.source_fingerprint
     prepared_at = $Recorded.prepared_at
-    repository_commit = Get-Commit $KdamgRoot
-    archipelago_commit = Get-Commit $KdamgApRoot
+    repository_commit = Get-Commit (Join-Path $KdamgRoot ".git")
+    archipelago_commit = Get-Commit $KdamgApGitDir
     fuzzer_commit = $FuzzerCommit
 }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)

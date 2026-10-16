@@ -110,10 +110,12 @@ developer what state it is in before a milestone release.
   `Archipelago/` and `KhimeraDAMG-AP-Mod/` are disposable clones (`CLAUDE.md`, "The two
   downloaded folders"), so what the commands above leave in them is expected: not a violation, not
   a finding, and not a reason to skip a permitted step. List it as a side effect under "Not
-  verified". After the build, the fuzzer and the tests, run `git -C Archipelago status` and
-  `git -C KhimeraDAMG-AP-Mod status`. None of the commands should change a *tracked* file in
-  either clone. If one did, leave it as it is, record it in the report, and tell the developer in
-  the chat reply (task 44).
+  verified". After the build, the fuzzer and the tests, run
+  `git --git-dir=.repos/Archipelago.git status` and
+  `git --git-dir=.repos/KhimeraDAMG-AP-Mod.git status`. The clones keep their git directories in
+  `.repos/`, so `git -C <folder>` would report on this repository instead. None of the commands
+  should change a *tracked* file in either clone. If one did, leave it as it is, record it in the
+  report, and tell the developer in the chat reply (task 44).
   </permissions>
 
   <build_states>
@@ -313,8 +315,8 @@ Phase 0: Preflight
    report filename. Note immediately if `APWORLD_VERSION` disagrees.
 4. Read `C:\ProgramData\Archipelago\manifest.json` and record the installed core version. Then
    record the `Archipelago/` clone's core version, and the tag and pinned commit it was set up at
-   (`git -C Archipelago describe --tags` and `refs/kdamg/pinned`). Record the commit the
-   `KhimeraDAMG-AP-Mod/` clone is pinned at as well.
+   (`git --git-dir=.repos/Archipelago.git describe --tags` and `refs/kdamg/pinned`). Record the
+   commit the `KhimeraDAMG-AP-Mod/` clone is pinned at as well.
 5. Check whether a previous report exists in `docs/report/` and read the latest one.
 6. Read `docs/Known Issues.md` and `docs/Future Reference.md`, and the root `todo`.
 

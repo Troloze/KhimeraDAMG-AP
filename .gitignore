@@ -2,6 +2,7 @@
 /.vscode/
 /Archipelago/
 /KhimeraDAMG-AP-Mod/
+/.repos/
 __pycache__/
 /khimera_damg/patches/*.zip
 /khimera_damg/patches/data.py

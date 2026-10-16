@@ -73,7 +73,7 @@ try {
         prepared_at = (Get-Date).ToString("s")
         apworld_sha256 = (Get-FileHash $KdamgInstalledApWorld -Algorithm SHA256).Hash
         source_fingerprint = $Fingerprint
-        archipelago_commit = (git -C $KdamgApRoot rev-parse HEAD).Trim()
+        archipelago_commit = (git --git-dir=$KdamgApGitDir rev-parse HEAD).Trim()
     }
     $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($KdamgStateFile, ($Recorded | ConvertTo-Json), $Utf8NoBom)

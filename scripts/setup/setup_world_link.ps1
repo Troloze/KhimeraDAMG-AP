@@ -68,21 +68,15 @@ if (-not $Existing) {
 
 # The link is a per-clone artifact, and left alone it shows up as untracked in the Archipelago
 # clone forever. info\exclude is the right home: it behaves like .gitignore but is local to the
-# clone and survives restore_archipelago.ps1, which never touches .git.
-$GitDir = & git -C $ApRoot rev-parse --absolute-git-dir
-if ($LASTEXITCODE -ne 0 -or -not $GitDir) {
-    Write-Error "Could not resolve the Archipelago clone's git directory."
-    exit 1
-}
-# Without a .git of its own, git -C resolves this repository's instead, and the entry would land
-# in the wrong exclude file.
-$ExpectedGitDir = [System.IO.Path]::GetFullPath((Join-Path $ApRoot ".git"))
-if ([System.IO.Path]::GetFullPath($GitDir.Trim()) -ne $ExpectedGitDir) {
-    Write-Error "$ApRoot is not a git clone of its own. Run scripts\restore_archipelago.ps1."
+# clone and survives restore_archipelago.ps1, which never touches the git directory. That lives
+# outside the clone, at $KdamgApGitDir (from build_state.ps1).
+if (-not (Test-Path (Join-Path $KdamgApGitDir "HEAD"))) {
+    Write-Error ("The Archipelago clone's git directory is missing from $KdamgApGitDir. " +
+                 "Run scripts\restore_archipelago.ps1.")
     exit 1
 }
 
-$ExcludeFile = Join-Path $GitDir "info\exclude"
+$ExcludeFile = Join-Path $KdamgApGitDir "info\exclude"
 $InfoDir = Split-Path $ExcludeFile -Parent
 if (-not (Test-Path $InfoDir)) {
     New-Item -ItemType Directory -Path $InfoDir | Out-Null
